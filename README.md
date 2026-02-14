@@ -78,7 +78,7 @@ The recommended way to install `kml2ofds` as a user is with [pipx][pipx].
 First ensure [pipx is installed](https://pipx.pypa.io/stable/#install-pipx), then:
 
 ```sh
-pipx install git+https://github.com/stevesong/kml2ofds.git@main
+pipx install git+https://github.com/Open-Telecoms-Data/kml2ofds.git@main
 ```
 
 Then run (you may need to restart your shell):
@@ -93,7 +93,7 @@ To install inside an existing Python virtual environment or conda environment:
 
 ```sh
 # First activate your environment, then:
-pip install git+https://github.com/stevesong/kml2ofds.git@main
+pip install git+https://github.com/Open-Telecoms-Data/kml2ofds.git@main
 ```
 
 ## Developing kml2ofds
