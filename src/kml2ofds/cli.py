@@ -4,9 +4,13 @@ CLI entry point and pipeline orchestration for kml2ofds.
 
 import os
 import sys
+from importlib.metadata import version
+
 import click
 
 from .config import load_config, Config
+
+__version__ = version("kml2ofds")
 
 TOTAL_STAGES = 8
 
@@ -255,7 +259,22 @@ def _validate_kml_exists(config: Config) -> None:
         sys.exit(1)
 
 
+def _print_version(ctx: click.Context, _param: click.Parameter, value: bool) -> None:
+    if value:
+        click.echo(f"kml2ofds, version {__version__}")
+        ctx.exit()
+
+
 @click.command(help="Convert KML files to the Open Fibre Data Standard format.")
+@click.option(
+    "-V",
+    "--version",
+    is_flag=True,
+    is_eager=True,
+    expose_value=False,
+    help="Show the version and exit.",
+    callback=_print_version,
+)
 @click.option(
     "--network-profile",
     required=True,
