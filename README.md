@@ -23,13 +23,13 @@ KML2OFDS expects a KML file that contains both fibre optic routes and points of 
 In broad strokes the script:
 
 * parses a KML document for features and separates them into nodes (any point feature) and spans (any LineString or collection of LineStrings);
-* checks for duplicate nodes based on node `name` and latitude/longitude with adjustable precision;
+* checks for duplicate nodes based on node `name` and latitude/longitude;
 * snaps nodes to the closest point on the closest span if they are not already on a span;
 * breaks each span at every point where a node intersects it, producing shorter spans;
-* associates each span with start and end nodes;
-* auto-generates nodes where a span lacks a start or end node (to comply with OFDS);
+* associates each span with a start and end node;
+* auto-generates nodes where a span lacks a start or end node;
 * adds metadata to spans and nodes;
-* consolidates auto-generated nodes: merges those in close proximity, merges auto-generated nodes with nearby proper nodes, and treats auto-generated nodes near spans as forks.
+* consolidates auto-generated nodes: merges those in close proximity, merges auto-generated nodes with nearby proper nodes, and treats auto-generated nodes near spans as network forks.
 
 ## Configuration (Network Profile)
 
