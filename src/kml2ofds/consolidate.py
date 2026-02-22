@@ -480,174 +480,187 @@ def _split_spans_at_auto_generated_nodes(
         & (gdf_ofds_nodes["id"].isin(span_endpoint_ids))
     ]
 
-    spans_to_remove = []
-    new_spans = []
     nodes_to_rename = {}
+    current_spans = gdf_ofds_spans.copy()
+    max_passes = len(auto_endpoints) + 5
 
-    for node_idx, node_row in auto_endpoints.iterrows():
-        node_point = node_row.geometry
-        node_id = node_row["id"]
+    for _pass in range(max_passes):
+        spans_to_remove = []
+        new_spans = []
+        processed_count = 0
 
-        node_span_idx = None
-        node_is_start = False
-        for span_idx, span_row in gdf_ofds_spans.iterrows():
-            if span_idx in spans_to_remove:
+        for node_idx, node_row in auto_endpoints.iterrows():
+            node_point = node_row.geometry
+            node_id = node_row["id"]
+            if node_id in nodes_to_rename:
                 continue
-            start_dict = parse_span_endpoint(span_row["start"], gdf_ofds_nodes)
-            end_dict = parse_span_endpoint(span_row["end"], gdf_ofds_nodes)
-            if start_dict and start_dict.get("id") == node_id:
-                node_span_idx = span_idx
-                node_is_start = True
-                break
-            elif end_dict and end_dict.get("id") == node_id:
-                node_span_idx = span_idx
-                node_is_start = False
-                break
 
-        if node_span_idx is None:
-            continue
+            node_span_idx = None
+            node_is_start = False
+            for span_idx, span_row in current_spans.iterrows():
+                if span_idx in spans_to_remove:
+                    continue
+                start_dict = parse_span_endpoint(span_row["start"], gdf_ofds_nodes)
+                end_dict = parse_span_endpoint(span_row["end"], gdf_ofds_nodes)
+                if start_dict and start_dict.get("id") == node_id:
+                    node_span_idx = span_idx
+                    node_is_start = True
+                    break
+                elif end_dict and end_dict.get("id") == node_id:
+                    node_span_idx = span_idx
+                    node_is_start = False
+                    break
 
-        min_dist = float("inf")
-        nearest_span_idx = None
-        nearest_pt = None
-        for span_idx, span_row in gdf_ofds_spans.iterrows():
-            if span_idx in spans_to_remove or span_idx == node_span_idx:
+            if node_span_idx is None:
                 continue
-            pt = nearest_points(node_point, span_row.geometry)[1]
-            d = node_point.distance(pt)
-            if d < min_dist:
-                min_dist = d
-                nearest_span_idx = span_idx
-                nearest_pt = pt
 
-        if min_dist == float("inf") or min_dist > threshold:
-            continue
-        if nearest_span_idx is None or nearest_pt is None:
-            continue
+            min_dist = float("inf")
+            nearest_span_idx = None
+            nearest_pt = None
+            for span_idx, span_row in current_spans.iterrows():
+                if span_idx in spans_to_remove or span_idx == node_span_idx:
+                    continue
+                pt = nearest_points(node_point, span_row.geometry)[1]
+                d = node_point.distance(pt)
+                if d < min_dist:
+                    min_dist = d
+                    nearest_span_idx = span_idx
+                    nearest_pt = pt
 
-        target_row = gdf_ofds_spans.loc[nearest_span_idx]
-        target_line = target_row.geometry
-        if (
-            nearest_pt.distance(Point(target_line.coords[0])) < tol
-            or nearest_pt.distance(Point(target_line.coords[-1])) < tol
-        ):
-            continue
+            if min_dist == float("inf") or min_dist > threshold:
+                continue
+            if nearest_span_idx is None or nearest_pt is None:
+                continue
 
-        node_span_row = gdf_ofds_spans.loc[node_span_idx]
-        node_span_geom = node_span_row.geometry
-        node_span_start = parse_span_endpoint(node_span_row["start"], gdf_ofds_nodes)
-        node_span_end = parse_span_endpoint(node_span_row["end"], gdf_ofds_nodes)
+            target_row = current_spans.loc[nearest_span_idx]
+            target_line = target_row.geometry
+            if (
+                nearest_pt.distance(Point(target_line.coords[0])) < tol
+                or nearest_pt.distance(Point(target_line.coords[-1])) < tol
+            ):
+                continue
 
-        fork_info = {
-            "id": node_id,
-            "name": NETWORK_FORK_NAME,
-            "location": {
-                "type": "Point",
-                "coordinates": [nearest_pt.x, nearest_pt.y],
-            },
-        }
+            node_span_row = current_spans.loc[node_span_idx]
+            node_span_geom = node_span_row.geometry
+            node_span_start = parse_span_endpoint(node_span_row["start"], gdf_ofds_nodes)
+            node_span_end = parse_span_endpoint(node_span_row["end"], gdf_ofds_nodes)
 
-        node_coords = list(node_span_geom.coords)
-        fork_coord = (nearest_pt.x, nearest_pt.y)
-        if node_is_start:
-            if Point(node_coords[0]).distance(nearest_pt) > 1e-9:
-                node_coords.insert(0, fork_coord)
-            ext_start = fork_info
-            ext_end = node_span_end.copy() if node_span_end else None
-        else:
-            if Point(node_coords[-1]).distance(nearest_pt) > 1e-9:
-                node_coords.append(fork_coord)
-            ext_start = node_span_start.copy() if node_span_start else None
-            ext_end = fork_info
+            fork_info = {
+                "id": node_id,
+                "name": NETWORK_FORK_NAME,
+                "location": {
+                    "type": "Point",
+                    "coordinates": [nearest_pt.x, nearest_pt.y],
+                },
+            }
 
-        ext_span = node_span_row.copy()
-        ext_span["geometry"] = LineString(node_coords)
-        ext_span["start"] = ext_start["id"] if ext_start else None
-        ext_span["end"] = ext_end["id"] if ext_end else None
-        ext_span["name"] = _span_name_from_endpoints(ext_start, ext_end)
-        new_spans.append(ext_span)
-        spans_to_remove.append(node_span_idx)
+            node_coords = list(node_span_geom.coords)
+            fork_coord = (nearest_pt.x, nearest_pt.y)
+            if node_is_start:
+                if Point(node_coords[0]).distance(nearest_pt) > 1e-9:
+                    node_coords.insert(0, fork_coord)
+                ext_start = fork_info
+                ext_end = node_span_end.copy() if node_span_end else None
+            else:
+                if Point(node_coords[-1]).distance(nearest_pt) > 1e-9:
+                    node_coords.append(fork_coord)
+                ext_start = node_span_start.copy() if node_span_start else None
+                ext_end = fork_info
 
-        target_coords = list(target_line.coords)
-        split_coord = (nearest_pt.x, nearest_pt.y)
-        insert_idx = None
-        min_seg_dist = float("inf")
-        for i in range(len(target_coords) - 1):
-            seg = LineString([target_coords[i], target_coords[i + 1]])
-            d = nearest_pt.distance(seg)
-            if d < min_seg_dist:
-                min_seg_dist = d
-                if Point(target_coords[i]).distance(nearest_pt) < tol:
-                    insert_idx = i
-                elif Point(target_coords[i + 1]).distance(nearest_pt) < tol:
-                    insert_idx = i + 1
-                else:
-                    insert_idx = i + 1
+            ext_span = node_span_row.copy()
+            ext_span["geometry"] = LineString(node_coords)
+            ext_span["start"] = ext_start["id"] if ext_start else None
+            ext_span["end"] = ext_end["id"] if ext_end else None
+            ext_span["name"] = _span_name_from_endpoints(ext_start, ext_end)
+            new_spans.append(ext_span)
+            spans_to_remove.append(node_span_idx)
 
-        if insert_idx is None:
-            continue
+            target_coords = list(target_line.coords)
+            split_coord = (nearest_pt.x, nearest_pt.y)
+            insert_idx = None
+            min_seg_dist = float("inf")
+            for i in range(len(target_coords) - 1):
+                seg = LineString([target_coords[i], target_coords[i + 1]])
+                d = nearest_pt.distance(seg)
+                if d < min_seg_dist:
+                    min_seg_dist = d
+                    if Point(target_coords[i]).distance(nearest_pt) < tol:
+                        insert_idx = i
+                    elif Point(target_coords[i + 1]).distance(nearest_pt) < tol:
+                        insert_idx = i + 1
+                    else:
+                        insert_idx = i + 1
 
-        exists = any(
-            Point(target_coords[j]).distance(nearest_pt) < tol
-            for j in range(len(target_coords))
-        )
-        if not exists:
-            target_coords.insert(insert_idx, split_coord)
+            if insert_idx is None:
+                continue
 
-        seg1_coords = target_coords[: insert_idx + 1]
-        seg2_coords = target_coords[insert_idx:]
-        if len(seg1_coords) < 2 or len(seg2_coords) < 2:
-            continue
-
-        seg1 = LineString(seg1_coords)
-        seg2 = LineString(seg2_coords)
-        target_start = parse_span_endpoint(target_row["start"], gdf_ofds_nodes)
-        target_end = parse_span_endpoint(target_row["end"], gdf_ofds_nodes)
-
-        seg1_start = Point(seg1.coords[0])
-        seg1_end = Point(seg1.coords[-1])
-        orig_start_pt = (
-            Point(target_start["location"]["coordinates"])
-            if target_start and target_start.get("location")
-            else None
-        )
-
-        if orig_start_pt and seg1_start.distance(orig_start_pt) < 1e-3:
-            s1_start, s1_end = target_start, fork_info
-            s2_start, s2_end = fork_info, target_end
-            s1_geom, s2_geom = seg1, seg2
-        elif orig_start_pt and seg1_end.distance(orig_start_pt) < 1e-3:
-            s1_start, s1_end = target_start, fork_info
-            s2_start, s2_end = fork_info, target_end
-            s1_geom, s2_geom = seg2, seg1
-        else:
-            s1_start, s1_end = target_start, fork_info
-            s2_start, s2_end = fork_info, target_end
-            s1_geom, s2_geom = seg2, seg1
-
-        for s, start_d, end_d, geom in [
-            (target_row, s1_start, s1_end, s1_geom),
-            (target_row, s2_start, s2_end, s2_geom),
-        ]:
-            ns = s.copy()
-            ns["id"] = str(uuid.uuid4())
-            ns["geometry"] = geom
-            ns["start"] = start_d["id"] if start_d else None
-            ns["end"] = end_d["id"] if end_d else None
-            ns["name"] = _span_name_from_endpoints(start_d, end_d)
-            new_spans.append(ns)
-        spans_to_remove.append(nearest_span_idx)
-        nodes_to_rename[node_id] = nearest_pt
-
-    if spans_to_remove:
-        gdf_ofds_spans = gdf_ofds_spans.drop(
-            index=[i for i in spans_to_remove if i in gdf_ofds_spans.index]
-        )
-        if new_spans:
-            new_gdf = gpd.GeoDataFrame(new_spans, crs=gdf_ofds_spans.crs)
-            gdf_ofds_spans = pd.concat(
-                [gdf_ofds_spans, new_gdf], ignore_index=True
+            exists = any(
+                Point(target_coords[j]).distance(nearest_pt) < tol
+                for j in range(len(target_coords))
             )
+            if not exists:
+                target_coords.insert(insert_idx, split_coord)
+
+            seg1_coords = target_coords[: insert_idx + 1]
+            seg2_coords = target_coords[insert_idx:]
+            if len(seg1_coords) < 2 or len(seg2_coords) < 2:
+                continue
+
+            seg1 = LineString(seg1_coords)
+            seg2 = LineString(seg2_coords)
+            target_start = parse_span_endpoint(target_row["start"], gdf_ofds_nodes)
+            target_end = parse_span_endpoint(target_row["end"], gdf_ofds_nodes)
+
+            seg1_start = Point(seg1.coords[0])
+            seg1_end = Point(seg1.coords[-1])
+            orig_start_pt = (
+                Point(target_start["location"]["coordinates"])
+                if target_start and target_start.get("location")
+                else None
+            )
+
+            if orig_start_pt and seg1_start.distance(orig_start_pt) < 1e-3:
+                s1_start, s1_end = target_start, fork_info
+                s2_start, s2_end = fork_info, target_end
+                s1_geom, s2_geom = seg1, seg2
+            elif orig_start_pt and seg1_end.distance(orig_start_pt) < 1e-3:
+                s1_start, s1_end = target_start, fork_info
+                s2_start, s2_end = fork_info, target_end
+                s1_geom, s2_geom = seg2, seg1
+            else:
+                s1_start, s1_end = target_start, fork_info
+                s2_start, s2_end = fork_info, target_end
+                s1_geom, s2_geom = seg2, seg1
+
+            for s, start_d, end_d, geom in [
+                (target_row, s1_start, s1_end, s1_geom),
+                (target_row, s2_start, s2_end, s2_geom),
+            ]:
+                ns = s.copy()
+                ns["id"] = str(uuid.uuid4())
+                ns["geometry"] = geom
+                ns["start"] = start_d["id"] if start_d else None
+                ns["end"] = end_d["id"] if end_d else None
+                ns["name"] = _span_name_from_endpoints(start_d, end_d)
+                new_spans.append(ns)
+            spans_to_remove.append(nearest_span_idx)
+            nodes_to_rename[node_id] = nearest_pt
+            processed_count += 1
+
+            current_spans = current_spans.drop(
+                index=[i for i in spans_to_remove if i in current_spans.index]
+            )
+            if new_spans:
+                new_gdf = gpd.GeoDataFrame(new_spans, crs=current_spans.crs)
+                current_spans = pd.concat(
+                    [current_spans, new_gdf], ignore_index=True
+                )
+            break
+
+        if processed_count == 0:
+            break
+
+    gdf_ofds_spans = current_spans
 
     for node_id, new_geom in nodes_to_rename.items():
         match = gdf_ofds_nodes[gdf_ofds_nodes["id"] == node_id]
