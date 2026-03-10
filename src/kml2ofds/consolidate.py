@@ -843,8 +843,9 @@ def _split_spans_at_proper_nodes(gdf_ofds_nodes, gdf_ofds_spans, threshold):
             elif Point(coords[i + 1]).distance(nearest_pt) < 1e-9:
                 insert_idx = i + 1
                 break
-            else:
+            elif d < tol:
                 insert_idx = i + 1
+                break
 
         if insert_idx is None:
             continue
@@ -1016,8 +1017,9 @@ def _split_spans_at_proper_node_endpoints(
             elif Point(coords[i + 1]).distance(nearest_pt) < 1e-9:
                 insert_idx = i + 1
                 break
-            else:
+            elif d < tol:
                 insert_idx = i + 1
+                break
 
         if insert_idx is None:
             continue
