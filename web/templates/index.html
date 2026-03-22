@@ -200,6 +200,16 @@
         .merge-options-group.disabled .merge-precision-row input {
             cursor: not-allowed;
         }
+        .node-label {
+            font-size: 11px;
+            font-weight: 500;
+            padding: 2px 6px;
+            background: rgba(255, 255, 255, 0.95);
+            border: 1px solid var(--border);
+            border-radius: 3px;
+            white-space: nowrap;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+        }
     </style>
 {% endblock %}
 {% block content %}
@@ -514,21 +524,41 @@
                 });
             }
 
+            const AUTO_GENERATED_NODE_NAME = {{ auto_generated_node_name | tojson }};
+            const NETWORK_FORK_NAME = {{ network_fork_name | tojson }};
+
             Promise.all([
                 fetch(nodesUrl).then(r => r.json()),
                 fetch(spansUrl).then(r => r.json())
             ]).then(([nodes, spans]) => {
-                const nodesGeoJson = L.geoJSON(nodes, {
-                    pointToLayer: (f, latlng) => L.circleMarker(latlng, {
-                        radius: 6,
-                        fillColor: '#198754',
-                        color: '#0d6efd',
-                        weight: 1,
-                        fillOpacity: 0.9
+                const filteredNodes = {
+                    ...nodes,
+                    features: (nodes.features || []).filter(f => {
+                        const name = f.properties?.name;
+                        return name !== AUTO_GENERATED_NODE_NAME && name !== NETWORK_FORK_NAME;
                     })
+                };
+                const nodesGeoJson = L.geoJSON(filteredNodes, {
+                    pointToLayer: (f, latlng) => {
+                        const marker = L.circleMarker(latlng, {
+                            radius: 6,
+                            fillColor: '#198754',
+                            color: '#0d6efd',
+                            weight: 1,
+                            fillOpacity: 0.9
+                        });
+                        const name = f.properties?.name ?? f.properties?.id ?? 'Unknown';
+                        marker.bindTooltip(String(name), {
+                            permanent: true,
+                            direction: 'top',
+                            offset: [0, -10],
+                            className: 'node-label'
+                        });
+                        return marker;
+                    }
                 });
                 nodesGeoJson.addTo(nodesLayer);
-                addNodesToBounds(nodes);
+                addNodesToBounds(filteredNodes);
 
                 const spansGeoJson = L.geoJSON(spans, {
                     style: { color: '#0066cc', weight: 2 }

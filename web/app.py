@@ -13,6 +13,7 @@ from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, Response, StreamingResponse
 from fastapi.templating import Jinja2Templates
 
+from kml2ofds.constants import AUTO_GENERATED_NODE_NAME, NETWORK_FORK_NAME
 from kml2ofds.rfc4122 import network_id_validation_error
 
 # In-memory store: token -> {"zip": bytes, "nodes": str, "spans": str}
@@ -82,7 +83,14 @@ def _sse_format(data: dict) -> str:
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     """Serve upload + profile form."""
-    return templates.TemplateResponse("index.html", {"request": request})
+    return templates.TemplateResponse(
+        "index.html",
+        {
+            "request": request,
+            "auto_generated_node_name": AUTO_GENERATED_NODE_NAME,
+            "network_fork_name": NETWORK_FORK_NAME,
+        },
+    )
 
 
 @app.get("/about", response_class=HTMLResponse)
