@@ -1,0 +1,666 @@
+{% extends "base.html" %}
+{% block title %}kml2ofds – Convert KML to Open Fibre Data Standard{% endblock %}
+{% block head_extras %}
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+    <style>
+        fieldset {
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 1.25rem 1.5rem;
+            margin-bottom: 1.5rem;
+            background: var(--surface);
+        }
+        legend {
+            font-weight: 600;
+            padding: 0 0.5rem;
+            color: var(--accent);
+            font-size: 1rem;
+        }
+        label {
+            display: block;
+            margin-top: 1rem;
+            font-size: 0.9rem;
+            color: var(--text);
+        }
+        label:first-of-type { margin-top: 0; }
+        input[type="text"], input[type="number"], input[type="file"], select {
+            width: 100%;
+            padding: 0.5rem 0.75rem;
+            margin-top: 0.25rem;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--text);
+            font-family: inherit;
+            font-size: 0.95rem;
+        }
+        input:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 2px rgba(0, 102, 204, 0.2);
+        }
+        input.input-invalid {
+            border-color: var(--error);
+        }
+        input.input-invalid:focus {
+            box-shadow: 0 0 0 2px rgba(220, 53, 69, 0.25);
+        }
+        .field-error-msg {
+            margin-top: 0.35rem;
+            font-size: 0.85rem;
+            color: var(--error);
+            line-height: 1.4;
+        }
+        input[type="checkbox"] {
+            margin-right: 0.5rem;
+        }
+        .checkbox-row {
+            display: flex;
+            align-items: center;
+            margin-top: 0.75rem;
+        }
+        button {
+            background: var(--accent);
+            color: white;
+            border: none;
+            padding: 0.6rem 1.5rem;
+            border-radius: 6px;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+        button:hover { background: var(--accent-hover); }
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        #progress-section {
+            display: none;
+            margin-top: 1.5rem;
+            padding: 1.25rem;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+        }
+        #progress-section.visible { display: block; }
+        #progress-list {
+            list-style: none;
+            padding: 0;
+            margin: 0.5rem 0 0;
+            font-size: 0.9rem;
+        }
+        #progress-list li {
+            padding: 0.25rem 0;
+            color: var(--text-muted);
+        }
+        #progress-list li.done {
+            color: var(--success);
+        }
+        #progress-list li.current {
+            color: var(--accent);
+            font-weight: 500;
+        }
+        #download-link {
+            display: inline-block;
+            margin-top: 1rem;
+            color: var(--accent);
+            font-weight: 600;
+            text-decoration: none;
+        }
+        #download-link:hover { text-decoration: underline; }
+        .error-msg {
+            color: var(--error);
+            margin-top: 0.5rem;
+        }
+        #map-section {
+            display: none;
+            margin-top: 1.5rem;
+        }
+        #map-section.visible { display: block; }
+        #map {
+            width: 100%;
+            height: 400px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            margin-top: 0.5rem;
+        }
+        .map-label {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            margin-bottom: 0.25rem;
+        }
+        .label-with-help {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+        }
+        .help-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 1rem;
+            height: 1rem;
+            border-radius: 50%;
+            background: var(--text-muted);
+            color: white;
+            font-size: 0.7rem;
+            font-weight: 600;
+            cursor: help;
+            position: relative;
+        }
+        .help-icon:hover {
+            background: var(--accent);
+        }
+        .help-icon .help-tooltip {
+            visibility: hidden;
+            position: absolute;
+            left: 0;
+            top: calc(100% + 0.35rem);
+            padding: 0.6rem 0.8rem;
+            background: var(--text);
+            color: white;
+            font-size: 0.8rem;
+            font-weight: 400;
+            line-height: 1.4;
+            width: 280px;
+            max-width: 90vw;
+            border-radius: 4px;
+            z-index: 100;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+        .help-icon .help-tooltip::before {
+            content: '';
+            position: absolute;
+            bottom: 100%;
+            left: 0.25rem;
+            border: 6px solid transparent;
+            border-bottom-color: var(--text);
+        }
+        .help-icon:hover .help-tooltip {
+            visibility: visible;
+        }
+        .help-icon .help-tooltip a {
+            color: #7dd3fc;
+            text-decoration: underline;
+        }
+        .merge-options-group {
+            margin-top: 1rem;
+            padding: 1rem;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+        }
+        .merge-options-group .merge-precision-row {
+            margin-top: 0.75rem;
+        }
+        .merge-options-group.disabled .merge-precision-row {
+            opacity: 0.5;
+        }
+        .merge-options-group.disabled .merge-precision-row input {
+            cursor: not-allowed;
+        }
+    </style>
+{% endblock %}
+{% block content %}
+    <h1>kml2ofds</h1>
+    <p class="subtitle">Convert KML fibre network maps to the Open Fibre Data Standard (OFDS)</p>
+
+    <form id="convert-form" enctype="multipart/form-data">
+        <fieldset>
+            <legend>Upload</legend>
+            <label for="kml_file">KML file (required)</label>
+            <input type="file" id="kml_file" name="kml_file" accept=".kml" required>
+        </fieldset>
+
+        <fieldset>
+            <legend>Network</legend>
+            <label for="network_name">
+                <span class="label-with-help">
+                    Network name
+                    <span class="help-icon">?
+                        <span class="help-tooltip">OFDS: A name for this network. A network is a telecommunication network consisting of a set of nodes interconnected by spans.</span>
+                    </span>
+                </span>
+            </label>
+            <input type="text" id="network_name" name="network_name" value="Default Network Name" placeholder="My Network">
+            <label for="network_id">
+                <span class="label-with-help">
+                    Network ID
+                    <span class="help-icon">?
+                        <span class="help-tooltip">OFDS: A universally unique identifier for this network. <strong>RFC 4122</strong> is the internet standard for UUIDs: a 128-bit value written as eight groups of hex digits (8-4-4-4-12), with rules for version and variant so ids stay unique. Leave this field empty and a valid UUID will be generated automatically. In general, you should leave this blank unless you already have a pre-existing identifier for your network. Full specification: <a href="https://www.rfc-editor.org/rfc/rfc4122" target="_blank" rel="noopener">RFC 4122</a>.</span>
+                    </span>
+                </span>
+            </label>
+            <input type="text" id="network_id" name="network_id" placeholder="e.g. 550e8400-e29b-41d4-a716-446655440000 (optional)" autocomplete="off">
+            <div id="network_id_error" class="field-error-msg" role="alert" aria-live="polite"></div>
+            <label for="network_status">
+                <span class="label-with-help">
+                    Network status
+                    <span class="help-icon">?
+                        <span class="help-tooltip">OFDS: The status of the network infrastructure, from the closed nodeStatus codelist.</span>
+                    </span>
+                </span>
+            </label>
+            <select id="network_status" name="network_status">
+                <option value="operational" selected>Operational</option>
+                <option value="proposed">Proposed</option>
+                <option value="planned">Planned</option>
+                <option value="underConstruction">Under construction</option>
+                <option value="inactive">Inactive</option>
+                <option value="decommissioned">Decommissioned</option>
+            </select>
+            <label for="output_name_prefix">Output filename prefix</label>
+            <input type="text" id="output_name_prefix" name="output_name_prefix" value="" placeholder="OFDS-My-Network-31-12-2025">
+        </fieldset>
+
+        <fieldset>
+            <legend>Providers (optional)</legend>
+            <label for="physicalInfrastructureProvider_name">
+                <span class="label-with-help">
+                    Physical infrastructure provider name
+                    <span class="help-icon">?
+                        <span class="help-tooltip">OFDS: An organisation that owns and maintains passive network infrastructure, i.e. the non-electrical elements, such as dark fibre, ducts and physical sites.</span>
+                    </span>
+                </span>
+            </label>
+            <input type="text" id="physicalInfrastructureProvider_name" name="physicalInfrastructureProvider_name">
+            <label for="physicalInfrastructureProvider_id">
+                <span class="label-with-help">
+                    Physical infrastructure provider ID
+                    <span class="help-icon">?
+                        <span class="help-tooltip">OFDS: Identifier for the organisation that owns the passive network infrastructure (dark fibre, ducts, physical sites).</span>
+                    </span>
+                </span>
+            </label>
+            <input type="text" id="physicalInfrastructureProvider_id" name="physicalInfrastructureProvider_id">
+            <label for="networkProviders_name">
+                <span class="label-with-help">
+                    Network providers name
+                    <span class="help-icon">?
+                        <span class="help-tooltip">OFDS: An organisation that operates the active network infrastructure, i.e. the electrical elements, such as optical transceivers, switches and routers. In open business models, network providers provide wholesale access to service providers.</span>
+                    </span>
+                </span>
+            </label>
+            <input type="text" id="networkProviders_name" name="networkProviders_name">
+            <label for="networkProviders_id">
+                <span class="label-with-help">
+                    Network providers ID
+                    <span class="help-icon">?
+                        <span class="help-tooltip">OFDS: Identifier for the organisation that operates the active network infrastructure (optical transceivers, switches, routers).</span>
+                    </span>
+                </span>
+            </label>
+            <input type="text" id="networkProviders_id" name="networkProviders_id">
+        </fieldset>
+
+        <fieldset>
+            <legend>Processing options</legend>
+            <label for="ignore_placemarks">
+                <span class="label-with-help">
+                    Nodes to Ignore
+                    <span class="help-icon">?
+                        <span class="help-tooltip">If there are nodes on the KML map that should be ignored, such as manholes for example, you can provide a semi-colon separated list of regular expressions to ignore. See <a href="https://docs.python.org/3/howto/regex.html" target="_blank" rel="noopener">Python regex guide</a> for a guide to regular expressions.</span>
+                    </span>
+                </span>
+            </label>
+            <input type="text" id="ignore_placemarks" name="ignore_placemarks" placeholder="name1; name2">
+            <label for="threshold_meters">
+                <span class="label-with-help">
+                    Consolidation threshold (meters)
+                    <span class="help-icon">?
+                        <span class="help-tooltip">The script adds nodes to the ends of spans that don't have a node in proximity. Sometimes this can lead to multiple nodes in proximity to each other that are actually only one node. This option sets a threshold in metres for how close nodes can be in proximity before they are merged by the script. You may need to experiment with this option to get the best output from the conversion script</span>
+                    </span>
+                </span>
+            </label>
+            <input type="number" id="threshold_meters" name="threshold_meters" value="5000" min="0" step="100">
+            <div class="checkbox-row">
+                <input type="checkbox" id="rename_spans_from_nodes" name="rename_spans_from_nodes" value="true">
+                <label for="rename_spans_from_nodes" style="margin-top:0">
+                    <span class="label-with-help">
+                        Rename spans from node names
+                        <span class="help-icon">?
+                            <span class="help-tooltip">When this option is clicked, each span will be given a name made of the start and end nodes of the span. e.g. 'Node A - Node B'</span>
+                        </span>
+                    </span>
+                </label>
+            </div>
+            <div class="merge-options-group" id="merge-options-group">
+                <div class="checkbox-row">
+                    <input type="checkbox" id="merge_contiguous_spans" name="merge_contiguous_spans" value="true">
+                    <label for="merge_contiguous_spans" style="margin-top:0">
+                        <span class="label-with-help">
+                            Merge contiguous spans
+                            <span class="help-icon">?
+                                <span class="help-tooltip">In some KML maps, a route between two nodes may be drawn as more than one line. The author of the KML map has effectively 'lifted the pen' when drawing the line, resulting in two or more lines that are intended to be a single route. This option concatenates these into a single span</span>
+                            </span>
+                        </span>
+                    </label>
+                </div>
+                <div class="merge-precision-row">
+                    <label for="merge_contiguous_spans_precision">
+                        <span class="label-with-help">
+                            Merge precision (decimal places)
+                            <span class="help-icon">?
+                                <span class="help-tooltip">This refers to how close the end points of lines to be concatenated should be to each other before being considered for merging. The decimal places refer to the number of decimal places in the latitude and longitude. See below for a rough guide:<br>1 decimal place – 10 km<br>2 decimal places – 1 km<br>3 decimal places – 100 m<br>4 decimal places – 10 m<br>5 decimal places – 1 m<br>6 decimal places – 1/10 m</span>
+                            </span>
+                        </span>
+                    </label>
+                    <select id="merge_contiguous_spans_precision" name="merge_contiguous_spans_precision">
+                        <option value="1">1</option>
+                        <option value="2">2</option>
+                        <option value="3">3</option>
+                        <option value="4">4</option>
+                        <option value="5">5</option>
+                        <option value="6" selected>6</option>
+                    </select>
+                </div>
+            </div>
+        </fieldset>
+
+        <button type="submit" id="submit-btn">Convert</button>
+    </form>
+
+    <div id="progress-section">
+        <strong>Progress</strong>
+        <ul id="progress-list"></ul>
+        <div id="download-container"></div>
+        <div id="map-section">
+            <div class="map-label">Map preview (nodes and spans)</div>
+            <div id="map"></div>
+        </div>
+        <div id="error-container" class="error-msg"></div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+    <script>
+        const form = document.getElementById('convert-form');
+        const submitBtn = document.getElementById('submit-btn');
+        const progressSection = document.getElementById('progress-section');
+        const mergeOptionsGroup = document.getElementById('merge-options-group');
+        const mergeCheckbox = document.getElementById('merge_contiguous_spans');
+        const mergePrecisionInput = document.getElementById('merge_contiguous_spans_precision');
+        const networkNameInput = document.getElementById('network_name');
+        const networkIdInput = document.getElementById('network_id');
+        const networkIdErrorEl = document.getElementById('network_id_error');
+        const outputNamePrefixInput = document.getElementById('output_name_prefix');
+
+        const NETWORK_ID_INVALID_MSG = (
+            'Network ID must be a valid UUID '
+            + 'Leave the field empty to auto-generate one.'
+        );
+
+        function isValidRfc4122NetworkId(value) {
+            const raw = String(value ?? '').trim();
+            if (!raw) return true;
+            let s = raw.replace(/^urn:uuid:/i, '').trim();
+            if (s.startsWith('{') && s.endsWith('}')) s = s.slice(1, -1);
+            const hexOnly = s.replace(/-/g, '');
+            if (!/^[0-9a-fA-F]{32}$/.test(hexOnly)) return false;
+            const variantNibble = parseInt(hexOnly[16], 16);
+            if (Number.isNaN(variantNibble) || variantNibble < 8 || variantNibble > 11) return false;
+            return true;
+        }
+
+        function clearNetworkIdFieldError() {
+            networkIdInput.classList.remove('input-invalid');
+            networkIdErrorEl.textContent = '';
+        }
+
+        networkIdInput.addEventListener('input', () => {
+            if (isValidRfc4122NetworkId(networkIdInput.value)) clearNetworkIdFieldError();
+        });
+
+        async function readHttpErrorDetail(response) {
+            const text = await response.text();
+            try {
+                const data = JSON.parse(text);
+                if (data.detail !== undefined) {
+                    const d = data.detail;
+                    if (Array.isArray(d)) {
+                        return d.map(item => (
+                            typeof item === 'object' && item.msg != null ? item.msg : String(item)
+                        )).join(' ');
+                    }
+                    return String(d);
+                }
+            } catch (_) { /* not JSON */ }
+            return text || `Error ${response.status}`;
+        }
+
+        function formatTodayDDMMYYYY() {
+            const d = new Date();
+            const day = String(d.getDate()).padStart(2, '0');
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const year = d.getFullYear();
+            return `${day}-${month}-${year}`;
+        }
+
+        function slugifyNetworkNameForPrefix(name) {
+            return name.trim().replace(/\s+/g, '-');
+        }
+
+        function computeDefaultOutputPrefix(networkName) {
+            const slug = slugifyNetworkNameForPrefix(networkName || '');
+            const date = formatTodayDDMMYYYY();
+            if (slug) {
+                return `OFDS-${slug}-${date}`;
+            }
+            return `OFDS-${date}`;
+        }
+
+        let lastAutoOutputPrefix = computeDefaultOutputPrefix(networkNameInput.value);
+        outputNamePrefixInput.value = lastAutoOutputPrefix;
+
+        networkNameInput.addEventListener('input', () => {
+            const next = computeDefaultOutputPrefix(networkNameInput.value);
+            if (outputNamePrefixInput.value === lastAutoOutputPrefix) {
+                outputNamePrefixInput.value = next;
+                lastAutoOutputPrefix = next;
+            }
+        });
+
+        function updateMergePrecisionState() {
+            const enabled = mergeCheckbox.checked;
+            mergeOptionsGroup.classList.toggle('disabled', !enabled);
+            mergePrecisionInput.disabled = !enabled;
+        }
+        mergeCheckbox.addEventListener('change', updateMergePrecisionState);
+        updateMergePrecisionState();
+        const progressList = document.getElementById('progress-list');
+        const downloadContainer = document.getElementById('download-container');
+        const mapSection = document.getElementById('map-section');
+        const mapDiv = document.getElementById('map');
+        const errorContainer = document.getElementById('error-container');
+
+        let mapInstance = null;
+
+        function renderMap(nodesUrl, spansUrl) {
+            if (mapInstance) {
+                mapInstance.remove();
+                mapInstance = null;
+            }
+            mapDiv.innerHTML = '';
+            mapSection.classList.add('visible');
+
+            const map = L.map('map').setView([0, 0], 2);
+            mapInstance = map;
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+            }).addTo(map);
+
+            const bounds = L.latLngBounds();
+            const nodesLayer = L.layerGroup();
+            const spansLayer = L.layerGroup();
+
+            function addNodesToBounds(geojson) {
+                if (!geojson.features) return;
+                geojson.features.forEach(f => {
+                    const coords = f.geometry?.coordinates;
+                    if (coords && f.geometry.type === 'Point') {
+                        bounds.extend([coords[1], coords[0]]);
+                    }
+                });
+            }
+
+            function addSpansToBounds(geojson) {
+                if (!geojson.features) return;
+                geojson.features.forEach(f => {
+                    const coords = f.geometry?.coordinates;
+                    if (coords && f.geometry.type === 'LineString') {
+                        coords.forEach(c => bounds.extend([c[1], c[0]]));
+                    }
+                });
+            }
+
+            Promise.all([
+                fetch(nodesUrl).then(r => r.json()),
+                fetch(spansUrl).then(r => r.json())
+            ]).then(([nodes, spans]) => {
+                const nodesGeoJson = L.geoJSON(nodes, {
+                    pointToLayer: (f, latlng) => L.circleMarker(latlng, {
+                        radius: 6,
+                        fillColor: '#198754',
+                        color: '#0d6efd',
+                        weight: 1,
+                        fillOpacity: 0.9
+                    })
+                });
+                nodesGeoJson.addTo(nodesLayer);
+                addNodesToBounds(nodes);
+
+                const spansGeoJson = L.geoJSON(spans, {
+                    style: { color: '#0066cc', weight: 2 }
+                });
+                spansGeoJson.addTo(spansLayer);
+                addSpansToBounds(spans);
+
+                nodesLayer.addTo(map);
+                spansLayer.addTo(map);
+
+                L.control.layers(
+                    {},
+                    { 'Nodes': nodesLayer, 'Spans': spansLayer },
+                    { collapsed: false }
+                ).addTo(map);
+
+                if (bounds.isValid()) {
+                    map.fitBounds(bounds, { padding: [30, 30], maxZoom: 16 });
+                }
+            }).catch(() => {
+                mapSection.querySelector('.map-label').textContent = 'Map preview unavailable';
+            });
+        }
+
+        const STAGES = [
+            'Parsing KML...',
+            'Breaking spans at node points...',
+            'Merging contiguous spans...',
+            'Adding missing nodes...',
+            'Adding nodes to spans...',
+            'Consolidating auto-generated nodes...',
+            'Final filter...',
+            'Exporting...'
+        ];
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            clearNetworkIdFieldError();
+            if (!isValidRfc4122NetworkId(networkIdInput.value)) {
+                networkIdInput.classList.add('input-invalid');
+                networkIdErrorEl.textContent = NETWORK_ID_INVALID_MSG;
+                networkIdInput.focus();
+                networkIdInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                return;
+            }
+
+            submitBtn.disabled = true;
+            progressSection.classList.add('visible');
+            progressSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            progressList.innerHTML = '';
+            downloadContainer.innerHTML = '';
+            mapSection.classList.remove('visible');
+            mapSection.querySelector('.map-label').textContent = 'Map preview (nodes and spans)';
+            errorContainer.textContent = '';
+
+            STAGES.forEach((msg, i) => {
+                const li = document.createElement('li');
+                li.id = `stage-${i + 1}`;
+                li.textContent = `[${i + 1}/8] ${msg}`;
+                progressList.appendChild(li);
+            });
+
+            const formData = new FormData(form);
+            formData.set('kml_file', form.kml_file.files[0]);
+
+            const response = await fetch('/convert', {
+                method: 'POST',
+                body: formData,
+            });
+
+            if (!response.ok) {
+                progressSection.classList.remove('visible');
+                progressList.innerHTML = '';
+                const err = await readHttpErrorDetail(response);
+                errorContainer.textContent = err;
+                if (response.status === 422) {
+                    networkIdInput.classList.add('input-invalid');
+                    networkIdErrorEl.textContent = err;
+                    networkIdInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+                submitBtn.disabled = false;
+                return;
+            }
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n\n');
+                buffer = lines.pop() || '';
+
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        try {
+                            const data = JSON.parse(line.slice(6));
+                            if (data.error) {
+                                errorContainer.textContent = data.error;
+                                break;
+                            }
+                            if (data.stage) {
+                                document.querySelectorAll('#progress-list li').forEach((li, i) => {
+                                    li.classList.remove('current', 'done');
+                                    if (i + 1 < data.stage) li.classList.add('done');
+                                    else if (i + 1 === data.stage) li.classList.add('current');
+                                });
+                            }
+                            if (data.done && data.download_url) {
+                                const a = document.createElement('a');
+                                a.id = 'download-link';
+                                a.href = data.download_url;
+                                a.textContent = 'Download ZIP (nodes.geojson, spans.geojson, ofds.json)';
+                                a.download = 'kml2ofds-output.zip';
+                                downloadContainer.innerHTML = '';
+                                downloadContainer.appendChild(a);
+                                document.querySelectorAll('#progress-list li').forEach(li => {
+                                    li.classList.remove('current');
+                                    li.classList.add('done');
+                                });
+                                if (data.geojson_nodes_url && data.geojson_spans_url) {
+                                    renderMap(data.geojson_nodes_url, data.geojson_spans_url);
+                                }
+                            }
+                        } catch (_) {}
+                    }
+                }
+            }
+
+            submitBtn.disabled = false;
+        });
+    </script>
+{% endblock %}

@@ -149,7 +149,8 @@ class TestIntegration:
     def test_full_pipeline(self):
         """Run full pipeline on minimal.kml and verify outputs."""
         from kml2ofds.config import load_config
-        from kml2ofds.cli import _run_pipeline, _ensure_directories
+        from kml2ofds.api import run_pipeline
+        from kml2ofds.cli import _ensure_directories
 
 
         cfg_path = ROOT / "tests" / "fixtures" / "minimal.ini"
@@ -166,7 +167,7 @@ class TestIntegration:
         if not os.path.exists(kml_path):
             pytest.skip(f"KML not found: {kml_path}")
 
-        _run_pipeline(config)
+        run_pipeline(config)
 
         paths = config.output_paths()
         assert os.path.exists(paths.nodes_geojson)
@@ -182,3 +183,47 @@ class TestIntegration:
         assert "features" in spans
         assert len(nodes["features"]) >= 2
         assert len(spans["features"]) >= 1
+
+
+class TestRfc4122NetworkId:
+    """Tests for optional Network ID validation (RFC 4122 UUID)."""
+
+    def test_empty_accepted(self):
+        from kml2ofds.rfc4122 import network_id_validation_error
+
+        assert network_id_validation_error(None) is None
+        assert network_id_validation_error("") is None
+        assert network_id_validation_error("   ") is None
+
+    def test_valid_uuid_accepted(self):
+        from kml2ofds.rfc4122 import network_id_validation_error
+
+        assert (
+            network_id_validation_error("550e8400-e29b-41d4-a716-446655440000")
+            is None
+        )
+        assert (
+            network_id_validation_error("{550e8400-e29b-41d4-a716-446655440000}")
+            is None
+        )
+        assert (
+            network_id_validation_error(
+                "urn:uuid:550e8400-e29b-41d4-a716-446655440000"
+            )
+            is None
+        )
+
+    def test_invalid_rejected(self):
+        from kml2ofds.rfc4122 import (
+            NETWORK_ID_INVALID_MESSAGE,
+            network_id_validation_error,
+        )
+
+        assert network_id_validation_error("not-a-uuid") == NETWORK_ID_INVALID_MESSAGE
+        assert network_id_validation_error("550e8400-e29b-41d4-a716") == (
+            NETWORK_ID_INVALID_MESSAGE
+        )
+        # Nil / all-zero UUID does not use the RFC 4122 variant in Python's model
+        assert network_id_validation_error(
+            "00000000-0000-0000-0000-000000000000"
+        ) == NETWORK_ID_INVALID_MESSAGE

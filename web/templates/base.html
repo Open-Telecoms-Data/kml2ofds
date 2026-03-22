@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}kml2ofds{% endblock %}</title>
+    <style>
+        :root {
+            --bg: #ffffff;
+            --surface: #f8f9fa;
+            --border: #dee2e6;
+            --text: #212529;
+            --text-muted: #6c757d;
+            --accent: #0066cc;
+            --accent-hover: #0052a3;
+            --success: #198754;
+            --error: #dc3545;
+        }
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            max-width: 720px;
+            margin: 0 auto;
+            padding: 2rem 1.5rem;
+        }
+        .site-header {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 0.5rem 1rem;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 1rem;
+            margin-bottom: 2rem;
+        }
+        .site-header a {
+            color: var(--accent);
+            text-decoration: none;
+            font-size: 0.9rem;
+        }
+        .site-header a:hover {
+            text-decoration: underline;
+        }
+        .site-nav {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.9rem;
+        }
+        .site-nav .nav-sep {
+            color: var(--text-muted);
+            font-weight: 300;
+        }
+        h1 {
+            font-size: 1.75rem;
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+            color: var(--text);
+        }
+        h2 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-top: 2rem;
+            margin-bottom: 0.5rem;
+            color: var(--text);
+        }
+        h3 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-top: 1.25rem;
+            margin-bottom: 0.35rem;
+            color: var(--text);
+        }
+        .subtitle {
+            color: var(--text-muted);
+            font-size: 1rem;
+            margin-bottom: 2rem;
+        }
+        p {
+            margin: 0 0 1rem;
+        }
+        a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        ul, ol {
+            margin: 0 0 1rem;
+            padding-left: 1.5rem;
+        }
+        li {
+            margin-bottom: 0.35rem;
+        }
+    </style>
+    {% block head_extras %}{% endblock %}
+</head>
+<body>
+    <header class="site-header">
+        <a href="https://ofds.info/en/" target="_blank" rel="noopener">← Open Fibre Data Standard</a>
+        <nav class="site-nav" aria-label="Site navigation">
+            <a href="/about">About</a>
+            <span class="nav-sep">·</span>
+            <a href="/">Converter</a>
+        </nav>
+    </header>
+    {% block content %}{% endblock %}
+</body>
+</html>

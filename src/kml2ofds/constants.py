@@ -13,8 +13,8 @@ FEATURE_TYPE_NODE = "node"
 FEATURE_TYPE_SPAN = "span"
 
 # Node type names
-AUTO_GENERATED_NODE_NAME = "Auto generated missing node"
-NETWORK_FORK_NAME = "network fork"
+AUTO_GENERATED_NODE_NAME = "default-node"
+NETWORK_FORK_NAME = "fork"
 
 
 class ToleranceConfig:

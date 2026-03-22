@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}About kml2ofds – Convert KML to Open Fibre Data Standard{% endblock %}
+{% block head_extras %}
+<meta name="description"
+    content="kml2ofds converts KML fibre network maps to the Open Fibre Data Standard (OFDS). Learn how it works, its limitations, and output formats.">
+{% endblock %}
+{% block content %}
+<h1>About kml2ofds</h1>
+<p class="subtitle">Convert KML fibre network maps to the Open Fibre Data Standard (OFDS)</p>
+
+<section id="overview">
+    <h2>Overview</h2>
+    <p>
+        kml2ofds is a tool for converting maps of terrestrial fibre networks created in KML format into <a
+            href="https://ofds.info/en/" target="_blank" rel="noopener">Open Fibre Data Standard
+            (OFDS)</a> compliant outputs. It produces nodes and spans as GeoJSON. The GeoJSON format lends itself to
+        online maps and GIS software. The script also outputs a structured OFDS JSON file. The JSON file captures the
+        relationships between the various tables making up the OFDS standard and is intended for importation into the
+        <a href="https://qgis.org/" target="_blank" rel="noopener">QGIS</a> platform using the <a href="https://github.com/Open-Telecoms-Data/ofds-qgis-plugin" target="_blank" rel="noopener">OFDS Studio</a> plugin.
+
+        
+</section>
+
+<section id="pipeline">
+    <h2>How it works</h2>
+    <p>The conversion follows this pipeline:</p>
+    <ol>
+        <li><strong>Parsing KML</strong> – Reads placemarks (points and lines) from the uploaded file.</li>
+        <li><strong>Filtering ignored nodes</strong> – Removes nodes that are marked as ignored in the configuration.
+        </li>
+        <li><strong>Breaking spans at node points</strong> – Splits line segments wherever they intersect with node
+            locations.</li>
+        <li><strong>Merging contiguous spans</strong> – Joins adjacent line segments that share endpoints (optional,
+            configurable).</li>
+        <li><strong>Adding missing nodes</strong> – Creates nodes at span endpoints that do not yet have a node.</li>
+        <li><strong>Adding nodes to spans</strong> – Associates each span with its start and end node references.</li>
+        <li><strong>Consolidating auto-generated nodes</strong> – Merges nodes that are closer than your consolidation
+            threshold.</li>
+        <li><strong>Final filter</strong> – Removes spans with identical start and end nodes, and applies network status
+            and provider metadata to all features.</li>
+        <li><strong>Exporting</strong> – Writes nodes.geojson, spans.geojson, and ofds.json to a ZIP file.</li>
+    </ol>
+    <p>The web form mirrors this flow: you upload a KML file, configure network metadata and processing options, then
+        download the results. A map preview shows nodes and spans after conversion.</p>
+</section>
+
+<section id="limitations">
+    <h2>Limitations</h2>
+
+    KML is a complex format with many possible variations. kml2ofds is designed to handle most common use cases, but may
+    not work for all KML files. You may need to adjust the configuration to get the best results. In some cases, you may
+    wish to edit the KML input
+    manually prior to conversion. The script also has the following specific constraints:
+
+    <ul>
+        <li><strong>File size</strong> – Maximum upload size is 50MB.</li>
+        <li><strong>Encoding</strong> – KML must be valid UTF-8 text.</li>
+    </ul>
+</section>
+
+<section id="outputs">
+    <h2>Outputs</h2>
+    <p>After conversion, you receive a ZIP archive containing:</p>
+    <ul>
+        <li><strong>nodes.geojson</strong> – Point features for each network node.</li>
+        <li><strong>spans.geojson</strong> – LineString features for each fibre span, with references to start and end
+            nodes.</li>
+        <li><strong>ofds.json</strong> – OFDS-compliant JSON file. Use <a href="https://qgis.org/" target="_blank"
+                rel="noopener">QGIS</a> and the <a href="https://github.com/Open-Telecoms-Data/ofds-qgis-plugin"
+                target="_blank" rel="noopener">OFDS Studio</a> plugin to import the data.</li>
+    </ul>
+    <p>You can validate OFDS output using the <a href="https://ofds.cove.opendataservices.coop/" target="_blank"
+            rel="noopener">COVE validation tool</a>.</p>
+</section>
+
+<p style="margin-top: 2rem;">
+    <a href="/">Start converting</a> →
+</p>
+{% endblock %}

@@ -14,6 +14,13 @@ from typing import Optional
 from .constants import DEFAULT_NETWORK_LINKS
 
 
+def _parse_bool(value: Optional[str], default: bool = False) -> bool:
+    """Parse string to bool."""
+    if value is None:
+        return default
+    return str(value).lower() in ("true", "1", "yes", "on")
+
+
 @dataclass
 class OutputPaths:
     """Resolved output file paths."""
@@ -72,6 +79,86 @@ class Config:
             ),
             debug_prefix=prefix,
         )
+
+
+def config_from_dict(
+    data: dict[str, str],
+    *,
+    input_directory: str = "input/",
+    output_directory: str = "output/",
+) -> Config:
+    """Build Config from a dict (e.g. form data). Uses same keys as INI profile."""
+    kml_file_name = data.get("kml_file_name") or "upload.kml"
+    network_name = data.get("network_name") or "Default Network Name"
+    network_id = data.get("network_id") or str(uuid.uuid4())
+    network_status = data.get("network_status") or "Operational"
+    network_link_url = data.get("network_links") or DEFAULT_NETWORK_LINKS
+    network_links = [{"rel": "describedby", "href": network_link_url}]
+
+    physical_infrastructure_provider_id = data.get(
+        "physicalInfrastructureProvider_id", ""
+    )
+    physical_infrastructure_provider_name = data.get(
+        "physicalInfrastructureProvider_name", ""
+    )
+    network_providers_id = data.get("networkProviders_id", "")
+    network_providers_name = data.get("networkProviders_name", "")
+
+    ignore_str = data.get("ignore_placemarks", "")
+    ignore_placemarks = [s.strip() for s in ignore_str.split(";") if s.strip()]
+
+    network_filename_normalised = kml_file_name.replace(" ", "_").upper()
+    output_name_prefix = (
+        data.get("output_name_prefix") or network_filename_normalised[:10]
+    )
+
+    threshold_str = data.get("threshold_meters", "5000")
+    try:
+        threshold_meters = float(threshold_str)
+    except (ValueError, TypeError):
+        threshold_meters = 5000.0
+
+    debug_enabled = _parse_bool(data.get("debug_enabled"), False)
+    rename_spans_from_nodes = _parse_bool(
+        data.get("rename_spans_from_nodes"), False
+    )
+    merge_contiguous_spans = _parse_bool(
+        data.get("merge_contiguous_spans"), False
+    )
+    validate_output = _parse_bool(data.get("validate_output"), False)
+
+    merge_precision_str = data.get("merge_contiguous_spans_precision", "6")
+    try:
+        merge_contiguous_spans_precision = int(merge_precision_str)
+    except (ValueError, TypeError):
+        merge_contiguous_spans_precision = 6
+
+    debug_output_directory = data.get(
+        "debug_output_directory", output_directory
+    )
+
+    return Config(
+        kml_file_name=kml_file_name,
+        network_id=network_id,
+        network_name=network_name,
+        network_status=network_status,
+        network_links=network_links,
+        physical_infrastructure_provider_id=physical_infrastructure_provider_id,
+        physical_infrastructure_provider_name=physical_infrastructure_provider_name,
+        network_providers_id=network_providers_id,
+        network_providers_name=network_providers_name,
+        ignore_placemarks=ignore_placemarks,
+        input_directory=input_directory,
+        output_directory=output_directory,
+        debug_output_directory=debug_output_directory,
+        output_name_prefix=output_name_prefix,
+        threshold_meters=threshold_meters,
+        debug_enabled=debug_enabled,
+        rename_spans_from_nodes=rename_spans_from_nodes,
+        merge_contiguous_spans=merge_contiguous_spans,
+        merge_contiguous_spans_precision=merge_contiguous_spans_precision,
+        validate_output=validate_output,
+    )
 
 
 def _case_preserving_config_parser() -> type[configparser.ConfigParser]:
@@ -156,19 +243,14 @@ def load_config(config_file: str) -> Config:
         threshold_meters = 5000.0
 
     # Booleans
-    def parse_bool(s: Optional[str], default: bool = False) -> bool:
-        if s is None:
-            return default
-        return str(s).lower() in ("true", "1", "yes", "on")
-
-    debug_enabled = parse_bool(parsed.get("debug_enabled"), False)
-    rename_spans_from_nodes = parse_bool(
+    debug_enabled = _parse_bool(parsed.get("debug_enabled"), False)
+    rename_spans_from_nodes = _parse_bool(
         parsed.get("rename_spans_from_nodes"), False
     )
-    merge_contiguous_spans = parse_bool(
+    merge_contiguous_spans = _parse_bool(
         parsed.get("merge_contiguous_spans"), False
     )
-    validate_output = parse_bool(parsed.get("validate_output"), False)
+    validate_output = _parse_bool(parsed.get("validate_output"), False)
 
     merge_precision_str = parsed.get(
         "merge_contiguous_spans_precision", "6"

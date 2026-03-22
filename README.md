@@ -96,6 +96,26 @@ To install inside an existing Python virtual environment or conda environment:
 pip install git+https://github.com/Open-Telecoms-Data/kml2ofds.git@main
 ```
 
+## Web service
+
+An online conversion service is included. Upload KML files, configure profile fields, and download the JSON and GeoJSON outputs.
+
+### Run locally
+
+```sh
+uv sync --extra web
+uv run uvicorn web.app:app --host 127.0.0.1 --port 8000
+```
+
+Then open http://127.0.0.1:8000
+
+### Run with Docker
+
+```sh
+docker build -t kml2ofds-web .
+docker run -p 8000:8000 kml2ofds-web
+```
+
 ## Developing kml2ofds
 
 Install the package as editable:

@@ -544,14 +544,15 @@ def add_missing_nodes(
         if not end_exists:
             add_if_new(end_pt)
 
+    crs = gdf_nodes.crs or "EPSG:4326"
     if new_nodes:
-        new_gdf = gpd.GeoDataFrame.from_features(new_nodes, crs=gdf_nodes.crs)
+        new_gdf = gpd.GeoDataFrame.from_features(new_nodes, crs=crs)
         combined = pd.concat([gdf_nodes, new_gdf], ignore_index=True)
     else:
         combined = gdf_nodes
         new_gdf = gpd.GeoDataFrame(
             {c: pd.Series(dtype=gdf_nodes[c].dtype) for c in gdf_nodes.columns}
-        ).set_crs(gdf_nodes.crs)
+        ).set_crs(crs)
 
     return combined, new_gdf
 
