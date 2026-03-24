@@ -10,6 +10,7 @@ from typing import Optional
 import numpy as np
 import pandas as pd
 import geopandas as gpd
+from scipy.spatial import cKDTree
 from shapely.geometry import (
     Point,
     LineString,
@@ -407,64 +408,128 @@ def break_spans_at_node_points(
 def merge_contiguous_spans(
     gdf_spans: gpd.GeoDataFrame,
     precision: int = 6,
+    endpoint_tolerance: float | None = None,
 ) -> gpd.GeoDataFrame:
-    """Merge spans that share endpoints (within coordinate precision)."""
+    """Merge spans whose endpoints meet within a distance tolerance.
+
+    Matches endpoints using planar distance in the data CRS (typically degrees
+    for WGS84), not bitwise equality of rounded coordinates. Supports both
+    head-to-tail chains and joins where a common vertex appears as two span
+    starts or two span ends (one segment is reversed when splicing).
+
+    If ``endpoint_tolerance`` is None, it defaults to ``10 ** (-precision)`` so
+    existing ``merge_contiguous_spans_precision`` settings keep a similar scale
+    (e.g. precision 3 → 1e-3).
+    """
     if len(gdf_spans) == 0:
         return gdf_spans
 
-    def round_coord(c):
-        return (round(c[0], precision), round(c[1], precision))
+    tol = float(endpoint_tolerance if endpoint_tolerance is not None else 10.0 ** (-precision))
+
+    def _endpoint_dist(a, b) -> float:
+        return float(np.hypot(a[0] - b[0], a[1] - b[1]))
 
     current = gdf_spans.copy()
     for _ in range(100):
         merged_list = []
         processed = set()
-        endpoint_map = {}
+        items = list(current.iterrows())
+        endpoints: list[tuple[object, bool, np.ndarray]] = []
+        for idx, row in items:
+            c = np.asarray(row.geometry.coords, dtype=float)
+            endpoints.append((idx, True, c[0].copy()))
+            endpoints.append((idx, False, c[-1].copy()))
+        pts = np.stack([e[2] for e in endpoints], axis=0)
+        tree = cKDTree(pts)
 
-        for idx, row in current.iterrows():
-            sc = round_coord(row.geometry.coords[0])
-            ec = round_coord(row.geometry.coords[-1])
-            endpoint_map.setdefault(sc, []).append((idx, True))
-            endpoint_map.setdefault(ec, []).append((idx, False))
+        def _pick_prepend(
+            merged_coords: list, idx: object, processed: set
+        ) -> tuple[list | None, object | None]:
+            p = merged_coords[0]
+            p_arr = np.asarray(p, dtype=float)
+            best: tuple[float, object, str] | None = None
+            for ei in tree.query_ball_point(p_arr, r=tol):
+                oidx, is_start, pos = endpoints[ei]
+                if oidx == idx or oidx in processed:
+                    continue
+                d = _endpoint_dist(pos, p)
+                if d > tol:
+                    continue
+                kind = "prepend_rev" if is_start else "prepend_fwd"
+                if best is None or d < best[0]:
+                    best = (d, oidx, kind)
+            if best is None:
+                return None, None
+            _, oidx, kind = best
+            oc = list(current.loc[oidx].geometry.coords)
+            if kind == "prepend_fwd":
+                j = tuple(oc[-1])
+                new_coords = [tuple(t) for t in oc[:-1]] + [j] + [
+                    tuple(merged_coords[i]) for i in range(1, len(merged_coords))
+                ]
+            else:
+                rev = list(reversed(oc))
+                j = tuple(rev[-1])
+                new_coords = [tuple(t) for t in rev[:-1]] + [j] + [
+                    tuple(merged_coords[i]) for i in range(1, len(merged_coords))
+                ]
+            return new_coords, oidx
+
+        def _pick_append(
+            merged_coords: list, idx: object, processed: set
+        ) -> tuple[list | None, object | None]:
+            p = merged_coords[-1]
+            p_arr = np.asarray(p, dtype=float)
+            best: tuple[float, object, str] | None = None
+            for ei in tree.query_ball_point(p_arr, r=tol):
+                oidx, is_start, pos = endpoints[ei]
+                if oidx == idx or oidx in processed:
+                    continue
+                d = _endpoint_dist(pos, p)
+                if d > tol:
+                    continue
+                kind = "append_fwd" if is_start else "append_rev"
+                if best is None or d < best[0]:
+                    best = (d, oidx, kind)
+            if best is None:
+                return None, None
+            _, oidx, kind = best
+            oc = list(current.loc[oidx].geometry.coords)
+            j = tuple(merged_coords[-1])
+            if kind == "append_fwd":
+                new_coords = [tuple(t) for t in merged_coords[:-1]] + [j] + [
+                    tuple(oc[i]) for i in range(1, len(oc))
+                ]
+            else:
+                rev = list(reversed(oc))
+                new_coords = [tuple(t) for t in merged_coords[:-1]] + [j] + [
+                    tuple(rev[i]) for i in range(1, len(rev))
+                ]
+            return new_coords, oidx
 
         merges_found = False
-        for idx, row in current.iterrows():
+        for idx, row in items:
             if idx in processed:
                 continue
-            merged_coords = list(row.geometry.coords)
+            merged_coords = [tuple(t) for t in row.geometry.coords]
             merged_span = row.copy()
 
             extended = True
             while extended:
                 extended = False
-                sc = round_coord(merged_coords[0])
-                ec = round_coord(merged_coords[-1])
-
-                for other_idx, is_other_start in endpoint_map.get(sc, [])[:]:
-                    if other_idx == idx or other_idx in processed:
-                        continue
-                    other = current.loc[other_idx]
-                    oec = round_coord(other.geometry.coords[-1])
-                    if not is_other_start and oec == sc:
-                        coords = list(other.geometry.coords)
-                        merged_coords = coords[:-1] + merged_coords
-                        processed.add(other_idx)
-                        merges_found = True
-                        extended = True
-                        break
-
-                for other_idx, is_other_start in endpoint_map.get(ec, [])[:]:
-                    if other_idx == idx or other_idx in processed:
-                        continue
-                    other = current.loc[other_idx]
-                    osc = round_coord(other.geometry.coords[0])
-                    if is_other_start and osc == ec:
-                        coords = list(other.geometry.coords)
-                        merged_coords = merged_coords + coords[1:]
-                        processed.add(other_idx)
-                        merges_found = True
-                        extended = True
-                        break
+                new_c, oidx = _pick_prepend(merged_coords, idx, processed)
+                if oidx is not None:
+                    merged_coords = new_c
+                    processed.add(oidx)
+                    merges_found = True
+                    extended = True
+                    continue
+                new_c, oidx = _pick_append(merged_coords, idx, processed)
+                if oidx is not None:
+                    merged_coords = new_c
+                    processed.add(oidx)
+                    merges_found = True
+                    extended = True
 
             if len(merged_coords) >= 2:
                 merged_span["geometry"] = LineString(merged_coords)

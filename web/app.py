@@ -10,7 +10,8 @@ import threading
 from pathlib import Path
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import HTMLResponse, Response, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, Response, StreamingResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from kml2ofds.constants import AUTO_GENERATED_NODE_NAME, NETWORK_FORK_NAME
@@ -27,6 +28,20 @@ app = FastAPI(title="kml2ofds Online", version="0.1.0")
 
 WEB_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(WEB_DIR / "templates"))
+
+app.mount("/static", StaticFiles(directory=str(WEB_DIR / "static")), name="static")
+
+FAVICON_PATH = WEB_DIR / "static" / "favicon.ico"
+
+
+@app.api_route(
+    "/favicon.ico", methods=["GET", "HEAD"], include_in_schema=False
+)
+async def favicon():
+    """Serve favicon at root (GET); HEAD for metadata-only checks (e.g. curl -I)."""
+    if FAVICON_PATH.exists():
+        return FileResponse(FAVICON_PATH, media_type="image/x-icon")
+    raise HTTPException(404, "Not found")
 
 
 def _run_conversion_thread(
@@ -47,7 +62,7 @@ def _run_conversion_thread(
             progress_callback=progress,
         )
 
-        # Build ZIP
+        # Build ZIP (result keys are prefixed filenames from output_paths)
         import zipfile
 
         zip_buffer = io.BytesIO()
@@ -55,9 +70,11 @@ def _run_conversion_thread(
             for name, content in result.items():
                 zf.writestr(name, content)
 
+        nodes_key = next(k for k in result if "ofds-nodes" in k and k.endswith(".geojson"))
+        spans_key = next(k for k in result if "ofds-spans" in k and k.endswith(".geojson"))
         token = secrets.token_urlsafe(16)
-        nodes_geojson = result["nodes.geojson"].decode("utf-8")
-        spans_geojson = result["spans.geojson"].decode("utf-8")
+        nodes_geojson = result[nodes_key].decode("utf-8")
+        spans_geojson = result[spans_key].decode("utf-8")
         with _store_lock:
             _download_store[token] = {
                 "zip": zip_buffer.getvalue(),
@@ -112,9 +129,9 @@ async def convert(
     networkProviders_id: str = Form(""),
     ignore_placemarks: str = Form(""),
     threshold_meters: str = Form("5000"),
-    rename_spans_from_nodes: str = Form("false"),
-    merge_contiguous_spans: str = Form("false"),
-    merge_contiguous_spans_precision: str = Form("6"),
+    rename_spans_from_nodes: str = Form("true"),
+    merge_contiguous_spans: str = Form("true"),
+    merge_contiguous_spans_precision: str = Form("3"),
 ):
     """Accept KML + form; stream progress via SSE; return download URL when done."""
     # Validate file

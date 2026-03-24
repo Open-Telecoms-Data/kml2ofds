@@ -37,7 +37,8 @@
             threshold.</li>
         <li><strong>Final filter</strong> – Removes spans with identical start and end nodes, and applies network status
             and provider metadata to all features.</li>
-        <li><strong>Exporting</strong> – Writes nodes.geojson, spans.geojson, and ofds.json to a ZIP file.</li>
+        <li><strong>Exporting</strong> – Writes prefixed GeoJSON and OFDS JSON files to a ZIP file (filenames use your
+            Output filename prefix and date, e.g. <code>{prefix}_ofds-nodes_{date}.geojson</code>).</li>
     </ol>
     <p>The web form mirrors this flow: you upload a KML file, configure network metadata and processing options, then
         download the results. A map preview shows nodes and spans after conversion.</p>
@@ -59,14 +60,17 @@
 
 <section id="outputs">
     <h2>Outputs</h2>
-    <p>After conversion, you receive a ZIP archive containing:</p>
+    <p>After conversion, you receive a ZIP archive containing three files named with your Output filename prefix and
+        date (e.g. <code>OFDS-My-Network-17-03-2026_ofds-nodes_17mar2026.geojson</code>):</p>
     <ul>
-        <li><strong>nodes.geojson</strong> – Point features for each network node.</li>
-        <li><strong>spans.geojson</strong> – LineString features for each fibre span, with references to start and end
-            nodes.</li>
-        <li><strong>ofds.json</strong> – OFDS-compliant JSON file. Use <a href="https://qgis.org/" target="_blank"
-                rel="noopener">QGIS</a> and the <a href="https://github.com/Open-Telecoms-Data/ofds-qgis-plugin"
-                target="_blank" rel="noopener">OFDS Studio</a> plugin to import the data.</li>
+        <li><strong>Nodes GeoJSON</strong> (<code>{prefix}_ofds-nodes_{date}.geojson</code>) – Point features for each
+            network node.</li>
+        <li><strong>Spans GeoJSON</strong> (<code>{prefix}_ofds-spans_{date}.geojson</code>) – LineString features for
+            each fibre span, with references to start and end nodes.</li>
+        <li><strong>OFDS JSON</strong> (<code>{prefix}_ofds-json_{date}.json</code>) – OFDS bundle for import into <a
+                href="https://qgis.org/" target="_blank" rel="noopener">QGIS</a> and the <a
+                href="https://github.com/Open-Telecoms-Data/ofds-qgis-plugin" target="_blank"
+                rel="noopener">OFDS Studio</a> plugin.</li>
     </ul>
     <p>You can validate OFDS output using the <a href="https://ofds.cove.opendataservices.coop/" target="_blank"
             rel="noopener">COVE validation tool</a>.</p>

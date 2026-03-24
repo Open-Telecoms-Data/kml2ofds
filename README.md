@@ -52,6 +52,7 @@ Key options in `default.profile`:
 | Option | Description |
 |--------|-------------|
 | `kml_file_name` | KML file to convert (required) |
+| `output_name_prefix` | Prefix for output filenames (e.g. `YOUR-PREFIX` → `YOUR-PREFIX_ofds-nodes_17mar2026.geojson`) |
 | `network_name`, `network_id` | Network metadata |
 | `network_status` | e.g. `Operational` |
 | `ignore_placemarks` | Semicolon-separated placemark names to ignore |

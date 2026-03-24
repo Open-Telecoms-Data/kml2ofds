@@ -16,16 +16,16 @@ ignore_placemarks =
 threshold_meters = 4000
 
 # create a new span name based on the start and end node names
-rename_spans_from_nodes = false
+rename_spans_from_nodes = true
 # write debug files to the output/debug/ directory
 debug_enabled = false  
 debug_output_directory = output/debug/
 
 # In some cases a contiguious span may be multiple spans in the KML file. This option will merge them into a single span.
 # The precision is the number of decimal places to consider when merging.
-merge_contiguous_spans = false
-merge_contiguous_spans_precision = 6
+merge_contiguous_spans = true
+merge_contiguous_spans_precision = 3
 
 [DIRECTORY]
-input_directory = input/cle
+input_directory = input/
 output_directory = output/

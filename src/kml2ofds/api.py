@@ -238,8 +238,8 @@ def run_conversion(
         progress_callback: Optional callback(stage, total, message) for progress.
 
     Returns:
-        Dict with keys "nodes.geojson", "spans.geojson", "ofds.json" mapping to
-        file contents as bytes.
+        Dict with keys being output filenames (from config output_paths, e.g.
+        "{prefix}_ofds-nodes_{date}.geojson") mapping to file contents as bytes.
 
     Raises:
         Exception: Any exception from the pipeline (parse errors, etc.).
@@ -266,11 +266,14 @@ def run_conversion(
 
         paths = config.output_paths()
         result: dict[str, bytes] = {}
+        nodes_filename = os.path.basename(paths.nodes_geojson)
+        spans_filename = os.path.basename(paths.spans_geojson)
+        ofds_filename = os.path.basename(paths.ofds_json)
         with open(paths.nodes_geojson, "rb") as f:
-            result["nodes.geojson"] = f.read()
+            result[nodes_filename] = f.read()
         with open(paths.spans_geojson, "rb") as f:
-            result["spans.geojson"] = f.read()
+            result[spans_filename] = f.read()
         with open(paths.ofds_json, "rb") as f:
-            result["ofds.json"] = f.read()
+            result[ofds_filename] = f.read()
 
         return result

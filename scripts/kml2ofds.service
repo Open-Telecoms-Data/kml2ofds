@@ -1,0 +1,20 @@
+[Unit]
+Description=kml2ofds web service
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/kml2ofds.opentelecomdata.org/htdocs
+ExecStart=/var/www/kml2ofds.opentelecomdata.org/htdocs/scripts/run_web.sh
+Restart=on-failure
+RestartSec=5
+
+# Ensure PATH includes common locations (for uv, python, etc. if needed)
+Environment="PATH=/usr/local/bin:/usr/bin:/bin"
+# If uv is in a user's .local/bin, add it (adjust User or path as needed):
+# Environment="PATH=/home/steve/.local/bin:/usr/local/bin:/usr/bin:/bin"
+
+[Install]
+WantedBy=multi-user.target

@@ -325,7 +325,7 @@
             </label>
             <input type="number" id="threshold_meters" name="threshold_meters" value="5000" min="0" step="100">
             <div class="checkbox-row">
-                <input type="checkbox" id="rename_spans_from_nodes" name="rename_spans_from_nodes" value="true">
+                <input type="checkbox" id="rename_spans_from_nodes" name="rename_spans_from_nodes" value="true" checked>
                 <label for="rename_spans_from_nodes" style="margin-top:0">
                     <span class="label-with-help">
                         Rename spans from node names
@@ -337,7 +337,7 @@
             </div>
             <div class="merge-options-group" id="merge-options-group">
                 <div class="checkbox-row">
-                    <input type="checkbox" id="merge_contiguous_spans" name="merge_contiguous_spans" value="true">
+                    <input type="checkbox" id="merge_contiguous_spans" name="merge_contiguous_spans" value="true" checked>
                     <label for="merge_contiguous_spans" style="margin-top:0">
                         <span class="label-with-help">
                             Merge contiguous spans
@@ -359,10 +359,10 @@
                     <select id="merge_contiguous_spans_precision" name="merge_contiguous_spans_precision">
                         <option value="1">1</option>
                         <option value="2">2</option>
-                        <option value="3">3</option>
+                        <option value="3" selected>3</option>
                         <option value="4">4</option>
                         <option value="5">5</option>
-                        <option value="6" selected>6</option>
+                        <option value="6">6</option>
                     </select>
                 </div>
             </div>
@@ -673,7 +673,7 @@
                                 const a = document.createElement('a');
                                 a.id = 'download-link';
                                 a.href = data.download_url;
-                                a.textContent = 'Download ZIP (nodes.geojson, spans.geojson, ofds.json)';
+                                a.textContent = 'Download ZIP (nodes, spans, ofds.json)';
                                 a.download = 'kml2ofds-output.zip';
                                 downloadContainer.innerHTML = '';
                                 downloadContainer.appendChild(a);
