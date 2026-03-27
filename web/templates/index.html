@@ -279,11 +279,12 @@
                 <span class="label-with-help">
                     Physical infrastructure provider ID
                     <span class="help-icon">?
-                        <span class="help-tooltip">OFDS: Identifier for the organisation that owns the passive network infrastructure (dark fibre, ducts, physical sites).</span>
+                        <span class="help-tooltip">OFDS: Identifier for the organisation that owns the passive network infrastructure (dark fibre, ducts, physical sites). Use an <strong>RFC 4122</strong> UUID (same form as Network ID). Leave empty and a valid UUID will be generated automatically.</span>
                     </span>
                 </span>
             </label>
-            <input type="text" id="physicalInfrastructureProvider_id" name="physicalInfrastructureProvider_id">
+            <input type="text" id="physicalInfrastructureProvider_id" name="physicalInfrastructureProvider_id" placeholder="e.g. 550e8400-e29b-41d4-a716-446655440000 (optional)" autocomplete="off">
+            <div id="physicalInfrastructureProvider_id_error" class="field-error-msg" role="alert" aria-live="polite"></div>
             <label for="networkProviders_name">
                 <span class="label-with-help">
                     Network providers name
@@ -297,11 +298,12 @@
                 <span class="label-with-help">
                     Network providers ID
                     <span class="help-icon">?
-                        <span class="help-tooltip">OFDS: Identifier for the organisation that operates the active network infrastructure (optical transceivers, switches, routers).</span>
+                        <span class="help-tooltip">OFDS: Identifier for the organisation that operates the active network infrastructure (optical transceivers, switches, routers). Use an <strong>RFC 4122</strong> UUID. Leave empty and a valid UUID will be generated automatically.</span>
                     </span>
                 </span>
             </label>
-            <input type="text" id="networkProviders_id" name="networkProviders_id">
+            <input type="text" id="networkProviders_id" name="networkProviders_id" placeholder="e.g. 550e8400-e29b-41d4-a716-446655440000 (optional)" autocomplete="off">
+            <div id="networkProviders_id_error" class="field-error-msg" role="alert" aria-live="polite"></div>
         </fieldset>
 
         <fieldset>
@@ -393,10 +395,22 @@
         const networkNameInput = document.getElementById('network_name');
         const networkIdInput = document.getElementById('network_id');
         const networkIdErrorEl = document.getElementById('network_id_error');
+        const pipIdInput = document.getElementById('physicalInfrastructureProvider_id');
+        const pipIdErrorEl = document.getElementById('physicalInfrastructureProvider_id_error');
+        const npIdInput = document.getElementById('networkProviders_id');
+        const npIdErrorEl = document.getElementById('networkProviders_id_error');
         const outputNamePrefixInput = document.getElementById('output_name_prefix');
 
         const NETWORK_ID_INVALID_MSG = (
-            'Network ID must be a valid UUID '
+            'Network ID must be a valid UUID. '
+            + 'Leave the field empty to auto-generate one.'
+        );
+        const PIP_ID_INVALID_MSG = (
+            'Physical infrastructure provider ID must be a valid UUID. '
+            + 'Leave the field empty to auto-generate one.'
+        );
+        const NP_ID_INVALID_MSG = (
+            'Network providers ID must be a valid UUID. '
             + 'Leave the field empty to auto-generate one.'
         );
 
@@ -417,8 +431,24 @@
             networkIdErrorEl.textContent = '';
         }
 
+        function clearPipIdFieldError() {
+            pipIdInput.classList.remove('input-invalid');
+            pipIdErrorEl.textContent = '';
+        }
+
+        function clearNpIdFieldError() {
+            npIdInput.classList.remove('input-invalid');
+            npIdErrorEl.textContent = '';
+        }
+
         networkIdInput.addEventListener('input', () => {
             if (isValidRfc4122NetworkId(networkIdInput.value)) clearNetworkIdFieldError();
+        });
+        pipIdInput.addEventListener('input', () => {
+            if (isValidRfc4122NetworkId(pipIdInput.value)) clearPipIdFieldError();
+        });
+        npIdInput.addEventListener('input', () => {
+            if (isValidRfc4122NetworkId(npIdInput.value)) clearNpIdFieldError();
         });
 
         async function readHttpErrorDetail(response) {
@@ -597,11 +627,27 @@
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
             clearNetworkIdFieldError();
+            clearPipIdFieldError();
+            clearNpIdFieldError();
             if (!isValidRfc4122NetworkId(networkIdInput.value)) {
                 networkIdInput.classList.add('input-invalid');
                 networkIdErrorEl.textContent = NETWORK_ID_INVALID_MSG;
                 networkIdInput.focus();
                 networkIdInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                return;
+            }
+            if (!isValidRfc4122NetworkId(pipIdInput.value)) {
+                pipIdInput.classList.add('input-invalid');
+                pipIdErrorEl.textContent = PIP_ID_INVALID_MSG;
+                pipIdInput.focus();
+                pipIdInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                return;
+            }
+            if (!isValidRfc4122NetworkId(npIdInput.value)) {
+                npIdInput.classList.add('input-invalid');
+                npIdErrorEl.textContent = NP_ID_INVALID_MSG;
+                npIdInput.focus();
+                npIdInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 return;
             }
 
@@ -635,9 +681,19 @@
                 const err = await readHttpErrorDetail(response);
                 errorContainer.textContent = err;
                 if (response.status === 422) {
-                    networkIdInput.classList.add('input-invalid');
-                    networkIdErrorEl.textContent = err;
-                    networkIdInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    if (!isValidRfc4122NetworkId(networkIdInput.value)) {
+                        networkIdInput.classList.add('input-invalid');
+                        networkIdErrorEl.textContent = err;
+                        networkIdInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    } else if (!isValidRfc4122NetworkId(pipIdInput.value)) {
+                        pipIdInput.classList.add('input-invalid');
+                        pipIdErrorEl.textContent = err;
+                        pipIdInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    } else if (!isValidRfc4122NetworkId(npIdInput.value)) {
+                        npIdInput.classList.add('input-invalid');
+                        npIdErrorEl.textContent = err;
+                        npIdInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
                 }
                 submitBtn.disabled = false;
                 return;

@@ -142,6 +142,16 @@ class TestConfig:
         assert config.network_name == "Test Network"
         assert config.input_directory == "tests/fixtures/"
 
+    def test_config_from_dict_generates_provider_uuids_when_blank(self):
+        import uuid
+
+        from kml2ofds.config import config_from_dict
+
+        c = config_from_dict({"kml_file_name": "x.kml"})
+        uuid.UUID(c.physical_infrastructure_provider_id)
+        uuid.UUID(c.network_providers_id)
+        assert c.physical_infrastructure_provider_id != c.network_providers_id
+
 
 class TestIntegration:
     """Integration test: full pipeline on minimal KML."""

@@ -96,12 +96,12 @@ def config_from_dict(
     network_links = [{"rel": "describedby", "href": network_link_url}]
 
     physical_infrastructure_provider_id = data.get(
-        "physicalInfrastructureProvider_id", ""
-    )
+        "physicalInfrastructureProvider_id"
+    ) or str(uuid.uuid4())
     physical_infrastructure_provider_name = data.get(
         "physicalInfrastructureProvider_name", ""
     )
-    network_providers_id = data.get("networkProviders_id", "")
+    network_providers_id = data.get("networkProviders_id") or str(uuid.uuid4())
     network_providers_name = data.get("networkProviders_name", "")
 
     ignore_str = data.get("ignore_placemarks", "")
@@ -209,11 +209,13 @@ def load_config(config_file: str) -> Config:
     # Providers
     physical_infrastructure_provider_id = parsed.get(
         "physicalInfrastructureProvider_id", ""
-    )
+    ) or str(uuid.uuid4())
     physical_infrastructure_provider_name = parsed.get(
         "physicalInfrastructureProvider_name", ""
     )
-    network_providers_id = parsed.get("networkProviders_id", "")
+    network_providers_id = parsed.get("networkProviders_id", "") or str(
+        uuid.uuid4()
+    )
     network_providers_name = parsed.get("networkProviders_name", "")
 
     # Ignore placemarks

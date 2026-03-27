@@ -99,7 +99,6 @@
         }
     </style>
     {% block head_extras %}{% endblock %}
-    <script defer src="https://cloud.umami.is/script.js" data-website-id="2b139042-74ff-4c33-be4d-e042ed0aec1f"></script>
 </head>
 <body>
     <header class="site-header">
@@ -111,5 +110,12 @@
         </nav>
     </header>
     {% block content %}{% endblock %}
+    <!-- Umami: pageviews POST to api-gateway.umami.dev (not cloud.umami.is). If no hits: check DevTools Network for that request; disable ad blockers; allow script-src https://cloud.umami.is and connect-src https://api-gateway.umami.dev in CSP. -->
+    <script
+        defer
+        src="https://cloud.umami.is/script.js"
+        data-website-id="2b139042-74ff-4c33-be4d-e042ed0aec1f"
+        data-host-url="https://api-gateway.umami.dev"
+    ></script>
 </body>
 </html>

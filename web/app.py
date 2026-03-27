@@ -15,7 +15,10 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from kml2ofds.constants import AUTO_GENERATED_NODE_NAME, NETWORK_FORK_NAME
-from kml2ofds.rfc4122 import network_id_validation_error
+from kml2ofds.rfc4122 import (
+    network_id_validation_error,
+    optional_rfc4122_uuid_validation_error,
+)
 
 # In-memory store: token -> {"zip": bytes, "nodes": str, "spans": str}
 _download_store: dict[str, dict] = {}
@@ -154,6 +157,18 @@ async def convert(
     nid_err = network_id_validation_error(network_id)
     if nid_err:
         raise HTTPException(422, nid_err)
+    pip_err = optional_rfc4122_uuid_validation_error(
+        physicalInfrastructureProvider_id,
+        label="Physical infrastructure provider ID",
+    )
+    if pip_err:
+        raise HTTPException(422, pip_err)
+    np_err = optional_rfc4122_uuid_validation_error(
+        networkProviders_id,
+        label="Network providers ID",
+    )
+    if np_err:
+        raise HTTPException(422, np_err)
 
     config_dict = {
         "kml_file_name": kml_file.filename,
