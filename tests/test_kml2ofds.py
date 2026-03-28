@@ -128,6 +128,112 @@ class TestFindEndPoint:
         assert result is None
 
 
+class TestBreakSpansAtNodePoints:
+    """Regression: STRtree bbox miss for near-collinear snapped nodes."""
+
+    def test_splits_when_node_slightly_off_axis_aligned_line(self):
+        """Snapped point with tiny y residual must still break horizontal span."""
+        import geopandas as gpd
+        from shapely.geometry import LineString, Point
+
+        from kml2ofds.geometry import break_spans_at_node_points
+
+        line = LineString([(0.0, 0.0), (10.0, 0.0)])
+        # Bbox of line is flat on y=0; point y>0 does not overlap line bbox with
+        # STRtree.query(line), but the point is still within NODE_SNAP of the line.
+        node = Point(5.0, 1e-12)
+        gdf_spans = gpd.GeoDataFrame(
+            {"name": ["main"], "geometry": [line]},
+            crs="EPSG:4326",
+        )
+        gdf_nodes = gpd.GeoDataFrame(
+            {"geometry": [node]},
+            crs="EPSG:4326",
+        )
+        out = break_spans_at_node_points(
+            gdf_nodes,
+            gdf_spans,
+            "N",
+            "nid",
+            [],
+            buffer_size=1e-4,
+        )
+        # Must split (not stay a single span); buffer/split may yield 2+ pieces.
+        assert len(out) >= 2
+
+    def test_merge_after_break_rejoins_node_splits(self):
+        """merge after break rejoins splits; pipeline runs merge first."""
+        import geopandas as gpd
+        from shapely.geometry import LineString, Point
+
+        from kml2ofds.geometry import (
+            break_spans_at_node_points,
+            merge_contiguous_spans,
+        )
+
+        line = LineString([(0, 0), (1, 0.05), (2, 0)])
+        node = Point(1.0, 0.05)
+        gdf_spans = gpd.GeoDataFrame(
+            {"name": ["s"], "geometry": [line]},
+            crs="EPSG:4326",
+        )
+        gdf_nodes = gpd.GeoDataFrame({"geometry": [node]}, crs="EPSG:4326")
+        broken = break_spans_at_node_points(
+            gdf_nodes,
+            gdf_spans,
+            "N",
+            "nid",
+            [],
+            buffer_size=1e-4,
+        )
+        assert len(broken) >= 2
+        rejoined = merge_contiguous_spans(broken, precision=6)
+        assert len(rejoined) == 1
+
+
+class TestMergeContiguousSpans:
+    """merge_contiguous_spans node-at-junction behaviour."""
+
+    def test_does_not_merge_two_spans_when_node_at_shared_endpoint(self):
+        """Separate KML paths meeting at a tip stay separate if a node marks it."""
+        import geopandas as gpd
+        from shapely.geometry import LineString, Point
+
+        from kml2ofds.geometry import merge_contiguous_spans
+
+        tip = (1.0, 0.1)
+        span1 = LineString([(0, 0), tip])
+        span2 = LineString([tip, (2, 0)])
+        gdf = gpd.GeoDataFrame(
+            {"name": ["arm_a", "arm_b"], "geometry": [span1, span2]},
+            crs="EPSG:4326",
+        )
+        nodes = gpd.GeoDataFrame(
+            {"geometry": [Point(tip)]},
+            crs="EPSG:4326",
+        )
+        out = merge_contiguous_spans(
+            gdf, precision=6, gdf_nodes=nodes
+        )
+        assert len(out) == 2
+
+    def test_merges_when_no_nodes_given(self):
+        import geopandas as gpd
+        from shapely.geometry import LineString
+
+        from kml2ofds.geometry import merge_contiguous_spans
+
+        tip = (1.0, 0.1)
+        span1 = LineString([(0, 0), tip])
+        span2 = LineString([tip, (2, 0)])
+        gdf = gpd.GeoDataFrame(
+            {"name": ["arm_a", "arm_b"], "geometry": [span1, span2]},
+            crs="EPSG:4326",
+        )
+        out = merge_contiguous_spans(gdf, precision=6, gdf_nodes=None)
+        assert len(out) == 1
+
+
 class TestConfig:
     """Tests for config loading."""
 
@@ -161,7 +267,6 @@ class TestIntegration:
         from kml2ofds.config import load_config
         from kml2ofds.api import run_pipeline
         from kml2ofds.cli import _ensure_directories
-
 
         cfg_path = ROOT / "tests" / "fixtures" / "minimal.ini"
         if not cfg_path.exists():

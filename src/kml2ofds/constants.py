@@ -29,5 +29,7 @@ class ToleranceConfig:
     # Geometry precision for buffer/within operations
     GEOMETRY_PRECISION = 1e-6
 
-    # Buffer size for very small tolerance operations
-    BUFFER_SIZE = 1e-9
+    # break_spans_at_node_points: max distance (planar degrees in CRS) from node to
+    # line for intersection + split. Same as NODE_SNAP; 1e-9° was below typical KML
+    # precision and missed breaks.
+    BUFFER_SIZE = NODE_SNAP

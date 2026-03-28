@@ -64,20 +64,44 @@ def run_pipeline(
     _stage(1, "Parsing KML...", progress_callback)
     gdf_ofds_nodes, gdf_spans = process_kml_file(config.kml_path(), config)
 
-    # 2. Break spans at node points
-    _stage(2, "Breaking spans at node points...", progress_callback)
+    # 2. Optional merge contiguous spans (before breaking at nodes).
+    # merge_contiguous_spans joins pieces that share endpoints. After
+    # break_spans_at_node_points those pieces are head-to-tail; merging then
+    # reassembles the line and drops the split (sharp bends, T-junctions, etc.).
     min_vert = pd.Series([len(x.coords) for x in gdf_spans.geometry]).min()
     print(
-        f"  Before: {len(gdf_spans)} spans, "
+        f"  After parse: {len(gdf_spans)} spans, "
         f"{len(gdf_ofds_nodes)} nodes, min vertices: {min_vert}"
     )
+    if config.merge_contiguous_spans:
+        _stage(2, "Merging contiguous spans...", progress_callback)
+        spans_before = len(gdf_spans)
+        print(
+            f"  Precision: {config.merge_contiguous_spans_precision} decimal places"
+        )
+        print(f"  Before merge: {spans_before} spans")
+        gdf_spans = merge_contiguous_spans(
+            gdf_spans,
+            precision=config.merge_contiguous_spans_precision,
+            gdf_nodes=gdf_ofds_nodes,
+        )
+        merged_n = spans_before - len(gdf_spans)
+        print(f"  After merge: {len(gdf_spans)} spans ({merged_n} merged)")
+    else:
+        _stage(2, "Merging contiguous spans... (skipped)", progress_callback)
 
+    # 3. Break spans at node points
+    _stage(3, "Breaking spans at node points...", progress_callback)
     gdf_nodes_for_breaking = filter_ignored_nodes(
         gdf_ofds_nodes, config.ignore_placemarks
     )
     print(
         f"  Filtered out ignored nodes: {len(gdf_ofds_nodes)} -> "
         f"{len(gdf_nodes_for_breaking)} nodes"
+    )
+    min_vert = pd.Series([len(x.coords) for x in gdf_spans.geometry]).min()
+    print(
+        f"  Before break: {len(gdf_spans)} spans, min vertices: {min_vert}"
     )
 
     gdf_spans = break_spans_at_node_points(
@@ -90,24 +114,8 @@ def run_pipeline(
 
     min_vert = pd.Series([len(x.coords) for x in gdf_spans.geometry]).min()
     print(
-        f"  After: {len(gdf_spans)} spans, "
-        f"{len(gdf_ofds_nodes)} nodes, min vertices: {min_vert}"
+        f"  After break: {len(gdf_spans)} spans, min vertices: {min_vert}"
     )
-
-    # 3. Optional merge contiguous spans
-    if config.merge_contiguous_spans:
-        _stage(3, "Merging contiguous spans...", progress_callback)
-        spans_before = len(gdf_spans)
-        print(
-            f"  Precision: {config.merge_contiguous_spans_precision} decimal places"
-        )
-        print(f"  Before merge: {spans_before} spans")
-        gdf_spans = merge_contiguous_spans(
-            gdf_spans, precision=config.merge_contiguous_spans_precision
-        )
-        print(f"  After merge: {len(gdf_spans)} spans ({spans_before - len(gdf_spans)} merged)")
-    else:
-        _stage(3, "Merging contiguous spans... (skipped)", progress_callback)
 
     # 4. Add missing nodes
     _stage(4, "Adding missing nodes...", progress_callback)

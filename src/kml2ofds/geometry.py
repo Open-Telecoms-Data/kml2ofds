@@ -331,7 +331,10 @@ def break_spans_at_node_points(
     network_links: list,
     buffer_size: float = ToleranceConfig.BUFFER_SIZE,
 ) -> gpd.GeoDataFrame:
-    """Break spans at every node intersection."""
+    """Break spans where each node lies within buffer_size of the line (degrees in CRS).
+
+    Default is ``ToleranceConfig.NODE_SNAP`` so breaks align with snap-to-line tolerance.
+    """
     split_lines = []
     self_intersects = []
     feature_type = "span"
@@ -343,10 +346,20 @@ def break_spans_at_node_points(
         span_name = line_row["name"]
         line_geom = line_row.geometry
 
-        # Find intersecting nodes using spatial index
+        # STRtree.query(line) uses bbox overlap only. Axis-aligned spans have a
+        # degenerate envelope, so a point with tiny float offset from the line
+        # (e.g. y=1e-12 on a horizontal segment) is missed. Query buffered line
+        # with predicate intersects instead.
         if node_tree is not None:
-            possible = node_tree.query(line_geom)
-            indices = np.atleast_1d(possible).tolist() if possible is not None else []
+            query_geom = line_geom.buffer(buffer_size)
+            possible = node_tree.query(
+                query_geom, predicate="intersects"
+            )
+            indices = (
+                np.atleast_1d(possible).tolist()
+                if possible is not None
+                else []
+            )
             intersected_points = []
             for idx in indices:
                 pt = gdf_nodes.geometry.iloc[idx]
@@ -409,6 +422,7 @@ def merge_contiguous_spans(
     gdf_spans: gpd.GeoDataFrame,
     precision: int = 6,
     endpoint_tolerance: float | None = None,
+    gdf_nodes: gpd.GeoDataFrame | None = None,
 ) -> gpd.GeoDataFrame:
     """Merge spans whose endpoints meet within a distance tolerance.
 
@@ -416,6 +430,14 @@ def merge_contiguous_spans(
     for WGS84), not bitwise equality of rounded coordinates. Supports both
     head-to-tail chains and joins where a common vertex appears as two span
     starts or two span ends (one segment is reversed when splicing).
+
+    In ``run_pipeline`` this runs before ``break_spans_at_node_points``. If it
+    ran after a break, it would rejoin split pieces (sharp bends, T-junctions,
+    etc.) and undo node-based splits.
+
+    If ``gdf_nodes`` is set, two spans are not merged when a node lies within
+    ``tol`` of the junction. That keeps separate KML paths that meet at a marked
+    node (e.g. two arms of a tight corner) as separate spans.
 
     If ``endpoint_tolerance`` is None, it defaults to ``10 ** (-precision)`` so
     existing ``merge_contiguous_spans_precision`` settings keep a similar scale
@@ -425,6 +447,21 @@ def merge_contiguous_spans(
         return gdf_spans
 
     tol = float(endpoint_tolerance if endpoint_tolerance is not None else 10.0 ** (-precision))
+
+    node_tree = None
+    if gdf_nodes is not None and len(gdf_nodes) > 0:
+        node_xy = np.array(
+            [(p.x, p.y) for p in gdf_nodes.geometry],
+            dtype=float,
+        )
+        if len(node_xy) > 0:
+            node_tree = cKDTree(node_xy)
+
+    def _junction_has_node(junction: tuple) -> bool:
+        if node_tree is None:
+            return False
+        p = np.asarray(junction[:2], dtype=float)
+        return len(node_tree.query_ball_point(p, r=tol)) > 0
 
     def _endpoint_dist(a, b) -> float:
         return float(np.hypot(a[0] - b[0], a[1] - b[1]))
@@ -454,6 +491,8 @@ def merge_contiguous_spans(
                     continue
                 d = _endpoint_dist(pos, p)
                 if d > tol:
+                    continue
+                if _junction_has_node(tuple(p)):
                     continue
                 kind = "prepend_rev" if is_start else "prepend_fwd"
                 if best is None or d < best[0]:
@@ -487,6 +526,8 @@ def merge_contiguous_spans(
                     continue
                 d = _endpoint_dist(pos, p)
                 if d > tol:
+                    continue
+                if _junction_has_node(tuple(p)):
                     continue
                 kind = "append_fwd" if is_start else "append_rev"
                 if best is None or d < best[0]:
