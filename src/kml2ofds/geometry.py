@@ -56,6 +56,102 @@ def snap_to_line(
     return nearest_point_on_line
 
 
+def meters_to_planar_degrees(meters: float) -> float:
+    """Approximate metres to degrees (latitude scale, same as consolidation)."""
+    return float(meters) / 111000.0
+
+
+def merge_proximate_nodes(
+    gdf_nodes: gpd.GeoDataFrame,
+    threshold_meters: float,
+) -> gpd.GeoDataFrame:
+    """Merge nodes within ``threshold_meters`` (planar distance in WGS84 degrees).
+
+    Uses the same degree-per-metre approximation as elsewhere in the package.
+    Combined ``name`` is unique original names in row order, joined with ``" / "``.
+    Merged geometry is the centroid. Each merged cluster gets a new ``id``; singletons
+    keep their properties.
+    """
+    if len(gdf_nodes) <= 1:
+        return gdf_nodes.copy()
+
+    gdf = gdf_nodes.reset_index(drop=True)
+    n = len(gdf)
+    coords = np.array(
+        [(gdf.geometry.iloc[i].x, gdf.geometry.iloc[i].y) for i in range(n)],
+        dtype=float,
+    )
+    r_deg = meters_to_planar_degrees(threshold_meters)
+    if r_deg <= 0:
+        return gdf_nodes.copy()
+
+    tree = cKDTree(coords)
+    parent = list(range(n))
+
+    def find(i: int) -> int:
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+
+    def union(i: int, j: int) -> None:
+        ri, rj = find(i), find(j)
+        if ri != rj:
+            parent[rj] = ri
+
+    for i in range(n):
+        for j in tree.query_ball_point(coords[i], r=r_deg):
+            j = int(j)
+            if j > i:
+                union(i, j)
+
+    clusters: dict[int, list[int]] = {}
+    for i in range(n):
+        r = find(i)
+        clusters.setdefault(r, []).append(i)
+
+    chunks: list[gpd.GeoDataFrame] = []
+    for _root, members in sorted(clusters.items(), key=lambda kv: min(kv[1])):
+        members.sort()
+        if len(members) == 1:
+            chunks.append(gdf.iloc[[members[0]]])
+            continue
+        sub = gdf.iloc[members]
+        cx = float(sub.geometry.x.mean())
+        cy = float(sub.geometry.y.mean())
+        names_ordered: list[str] = []
+        seen: set[str] = set()
+        for k in members:
+            raw = gdf.iloc[k].get("name")
+            s = "" if raw is None else str(raw).strip()
+            if s and s not in seen:
+                seen.add(s)
+                names_ordered.append(s)
+        merged_name = " / ".join(names_ordered)
+        row0 = gdf.iloc[members[0]].copy()
+        row0["geometry"] = Point(cx, cy)
+        row0["name"] = merged_name
+        row0["id"] = str(uuid.uuid4())
+        chunks.append(gpd.GeoDataFrame([row0.to_dict()], crs=gdf.crs))
+
+    out = pd.concat(chunks, ignore_index=True)
+    return gpd.GeoDataFrame(out, geometry="geometry", crs=gdf_nodes.crs)
+
+
+def snap_nodes_to_spans(
+    gdf_nodes: gpd.GeoDataFrame,
+    gdf_spans: gpd.GeoDataFrame,
+) -> gpd.GeoDataFrame:
+    """Snap every node point to the nearest span geometry (see ``snap_to_line``)."""
+    if len(gdf_nodes) == 0:
+        return gdf_nodes.copy()
+    snapped = gdf_nodes.geometry.map(lambda p: snap_to_line(p, gdf_spans))
+    out = gpd.GeoDataFrame(gdf_nodes.drop(columns="geometry").copy())
+    out["geometry"] = snapped
+    out.set_geometry("geometry", inplace=True)
+    return out
+
+
 def parse_span_endpoint(
     endpoint,
     gdf_nodes: Optional[gpd.GeoDataFrame] = None,

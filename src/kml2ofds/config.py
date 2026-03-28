@@ -54,6 +54,8 @@ class Config:
     rename_spans_from_nodes: bool
     merge_contiguous_spans: bool
     merge_contiguous_spans_precision: int
+    merge_proximate_nodes: bool
+    merge_proximate_nodes_meters: float
     validate_output: bool = False
 
     def kml_path(self) -> str:
@@ -125,7 +127,16 @@ def config_from_dict(
     merge_contiguous_spans = _parse_bool(
         data.get("merge_contiguous_spans"), False
     )
+    merge_proximate_nodes = _parse_bool(
+        data.get("merge_proximate_nodes"), False
+    )
     validate_output = _parse_bool(data.get("validate_output"), False)
+
+    merge_nodes_m_str = data.get("merge_proximate_nodes_meters", "50")
+    try:
+        merge_proximate_nodes_meters = float(merge_nodes_m_str)
+    except (ValueError, TypeError):
+        merge_proximate_nodes_meters = 50.0
 
     merge_precision_str = data.get("merge_contiguous_spans_precision", "6")
     try:
@@ -157,6 +168,8 @@ def config_from_dict(
         rename_spans_from_nodes=rename_spans_from_nodes,
         merge_contiguous_spans=merge_contiguous_spans,
         merge_contiguous_spans_precision=merge_contiguous_spans_precision,
+        merge_proximate_nodes=merge_proximate_nodes,
+        merge_proximate_nodes_meters=merge_proximate_nodes_meters,
         validate_output=validate_output,
     )
 
@@ -252,7 +265,20 @@ def load_config(config_file: str) -> Config:
     merge_contiguous_spans = _parse_bool(
         parsed.get("merge_contiguous_spans"), False
     )
+    merge_proximate_nodes = _parse_bool(
+        parsed.get("merge_proximate_nodes"), False
+    )
     validate_output = _parse_bool(parsed.get("validate_output"), False)
+
+    merge_nodes_m_str = parsed.get("merge_proximate_nodes_meters", "50")
+    try:
+        merge_proximate_nodes_meters = float(merge_nodes_m_str)
+    except (ValueError, TypeError):
+        print(
+            f"Warning: Invalid merge_proximate_nodes_meters "
+            f"'{merge_nodes_m_str}'. Using default 50."
+        )
+        merge_proximate_nodes_meters = 50.0
 
     merge_precision_str = parsed.get(
         "merge_contiguous_spans_precision", "6"
@@ -282,5 +308,7 @@ def load_config(config_file: str) -> Config:
         rename_spans_from_nodes=rename_spans_from_nodes,
         merge_contiguous_spans=merge_contiguous_spans,
         merge_contiguous_spans_precision=merge_contiguous_spans_precision,
+        merge_proximate_nodes=merge_proximate_nodes,
+        merge_proximate_nodes_meters=merge_proximate_nodes_meters,
         validate_output=validate_output,
     )

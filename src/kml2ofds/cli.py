@@ -77,10 +77,46 @@ def _print_version(ctx: click.Context, _param: click.Parameter, value: bool) -> 
     help="Path to the network profile configuration file (required).",
     type=click.Path(exists=True),
 )
-def main(network_profile: str) -> None:
+@click.option(
+    "--merge-proximate-nodes",
+    is_flag=True,
+    default=False,
+    help="Enable proximate node merge (overrides profile).",
+)
+@click.option(
+    "--no-merge-proximate-nodes",
+    is_flag=True,
+    default=False,
+    help="Disable proximate node merge (overrides profile).",
+)
+@click.option(
+    "--merge-proximate-nodes-meters",
+    type=float,
+    default=None,
+    help="Proximity threshold in metres for node merge (overrides profile).",
+)
+def main(
+    network_profile: str,
+    merge_proximate_nodes: bool,
+    no_merge_proximate_nodes: bool,
+    merge_proximate_nodes_meters: float | None,
+) -> None:
     """Convert KML files to the Open Fibre Data Standard format."""
     print(f"Running with network_profile: {network_profile}")
+    if merge_proximate_nodes and no_merge_proximate_nodes:
+        raise click.UsageError(
+            "Use only one of --merge-proximate-nodes and "
+            "--no-merge-proximate-nodes."
+        )
     config = load_config(network_profile)
+    if merge_proximate_nodes:
+        config.merge_proximate_nodes = True
+    elif no_merge_proximate_nodes:
+        config.merge_proximate_nodes = False
+    if merge_proximate_nodes_meters is not None:
+        config.merge_proximate_nodes_meters = float(
+            merge_proximate_nodes_meters
+        )
     _ensure_directories(config)
     _validate_kml_exists(config)
     run_pipeline(config)

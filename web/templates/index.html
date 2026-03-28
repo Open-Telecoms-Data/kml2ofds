@@ -317,6 +317,26 @@
                 </span>
             </label>
             <input type="text" id="ignore_placemarks" name="ignore_placemarks" placeholder="name1; name2">
+            <div class="checkbox-row">
+                <input type="checkbox" id="merge_proximate_nodes" name="merge_proximate_nodes" value="true">
+                <label for="merge_proximate_nodes" style="margin-top:0">
+                    <span class="label-with-help">
+                        Merge proximate nodes
+                        <span class="help-icon">?
+                            <span class="help-tooltip">Before snapping or splitting, merge node placemarks that are within the distance below. The merged name combines originals, e.g. <strong>Node A / Node B</strong>. Uses the same metre→degree approximation as elsewhere (latitude scale).</span>
+                        </span>
+                    </span>
+                </label>
+            </div>
+            <label for="merge_proximate_nodes_meters">
+                <span class="label-with-help">
+                    Proximate node merge distance (metres)
+                    <span class="help-icon">?
+                        <span class="help-tooltip">Maximum distance between node positions to merge when the option above is enabled. Default 50.</span>
+                    </span>
+                </span>
+            </label>
+            <input type="number" id="merge_proximate_nodes_meters" name="merge_proximate_nodes_meters" value="50" min="0" step="1">
             <label for="threshold_meters">
                 <span class="label-with-help">
                     Consolidation threshold (meters)

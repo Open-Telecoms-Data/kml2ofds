@@ -245,8 +245,8 @@ def _ctx_from_config(config: "Config") -> ParseContext:
     )
 
 
-def process_kml_file(path: str, config: "Config") -> tuple[gpd.GeoDataFrame, gpd.GeoDataFrame]:
-    """Parse KML file and return (nodes_gdf, spans_gdf). No file writes."""
+def parse_kml_to_geodataframes(path: str, config: "Config") -> tuple[gpd.GeoDataFrame, gpd.GeoDataFrame]:
+    """Parse KML to node and span GeoDataFrames. Does not snap nodes to spans."""
     try:
         with open(path) as f:
             kml_doc = parser.parse(f).getroot()
@@ -311,21 +311,8 @@ def process_kml_file(path: str, config: "Config") -> tuple[gpd.GeoDataFrame, gpd
     gdf_nodes = gpd.GeoDataFrame.from_features(geojson_nodes)
     gdf_spans = gpd.GeoDataFrame.from_features(geojson_spans)
 
-    # Snap nodes to spans (import here to avoid circular import at module load)
-    from .geometry import snap_to_line
+    return gdf_nodes, gdf_spans
 
-    n_nodes = len(gdf_nodes)
-    n_spans = len(gdf_spans)
-    print(
-        f"Snapping {n_nodes} nodes to {n_spans} spans "
-        f"(this may take several minutes for large files)...",
-        flush=True,
-    )
-    snapped = gdf_nodes.geometry.map(
-        lambda p: snap_to_line(p, gdf_spans)
-    )
-    gdf_ofds_nodes = gpd.GeoDataFrame(gdf_nodes.drop(columns="geometry").copy())
-    gdf_ofds_nodes["geometry"] = snapped
-    gdf_ofds_nodes.set_geometry("geometry", inplace=True)
 
-    return gdf_ofds_nodes, gdf_spans
+# Backward-compatible alias (snapping is performed in ``run_pipeline``).
+process_kml_file = parse_kml_to_geodataframes

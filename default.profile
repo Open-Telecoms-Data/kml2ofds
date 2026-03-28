@@ -26,6 +26,10 @@ debug_output_directory = output/debug/
 merge_contiguous_spans = true
 merge_contiguous_spans_precision = 3
 
+# Merge distinct KML nodes within this distance (metres); combined name is "A / B". Default off.
+merge_proximate_nodes = false
+merge_proximate_nodes_meters = 50
+
 [DIRECTORY]
 input_directory = input/
 output_directory = output/

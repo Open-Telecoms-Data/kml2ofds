@@ -191,6 +191,43 @@ class TestBreakSpansAtNodePoints:
         assert len(rejoined) == 1
 
 
+class TestMergeProximateNodes:
+    """merge_proximate_nodes clusters and naming."""
+
+    def test_merges_two_close_nodes_combines_names(self):
+        import geopandas as gpd
+        from shapely.geometry import Point
+
+        from kml2ofds.geometry import merge_proximate_nodes
+
+        # ~11 m east of (0,0) at the equator — within 50 m threshold
+        gdf = gpd.GeoDataFrame(
+            {
+                "id": ["a", "b"],
+                "name": ["Node A", "Node B"],
+                "geometry": [Point(0, 0), Point(1e-4, 0)],
+            },
+            crs="EPSG:4326",
+        )
+        out = merge_proximate_nodes(gdf, 50.0)
+        assert len(out) == 1
+        assert out.iloc[0]["name"] == "Node A / Node B"
+
+    def test_singleton_unchanged(self):
+        import geopandas as gpd
+        from shapely.geometry import Point
+
+        from kml2ofds.geometry import merge_proximate_nodes
+
+        gdf = gpd.GeoDataFrame(
+            {"id": ["x"], "name": ["Only"], "geometry": [Point(1, 1)]},
+            crs="EPSG:4326",
+        )
+        out = merge_proximate_nodes(gdf, 50.0)
+        assert len(out) == 1
+        assert out.iloc[0]["name"] == "Only"
+
+
 class TestMergeContiguousSpans:
     """merge_contiguous_spans node-at-junction behaviour."""
 

@@ -135,6 +135,8 @@ async def convert(
     rename_spans_from_nodes: str = Form("true"),
     merge_contiguous_spans: str = Form("true"),
     merge_contiguous_spans_precision: str = Form("3"),
+    merge_proximate_nodes: str = Form(""),
+    merge_proximate_nodes_meters: str = Form("50"),
 ):
     """Accept KML + form; stream progress via SSE; return download URL when done."""
     # Validate file
@@ -185,6 +187,8 @@ async def convert(
         "rename_spans_from_nodes": rename_spans_from_nodes,
         "merge_contiguous_spans": merge_contiguous_spans,
         "merge_contiguous_spans_precision": merge_contiguous_spans_precision,
+        "merge_proximate_nodes": merge_proximate_nodes,
+        "merge_proximate_nodes_meters": merge_proximate_nodes_meters,
     }
     config_dict = {k: (v or "") for k, v in config_dict.items()}
 

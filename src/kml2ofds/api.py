@@ -9,7 +9,7 @@ from typing import Optional
 
 from .config import Config, config_from_dict, OutputPaths
 
-TOTAL_STAGES = 8
+TOTAL_STAGES = 10
 
 
 def _stage(
@@ -44,6 +44,8 @@ def run_pipeline(
         add_nodes_to_spans,
         filter_ignored_nodes,
         merge_contiguous_spans,
+        merge_proximate_nodes,
+        snap_nodes_to_spans,
         apply_network_status,
         apply_provider_info,
     )
@@ -60,11 +62,37 @@ def run_pipeline(
     print("Modules loaded.", flush=True)
     paths = config.output_paths()
 
-    # 1. Parse KML
+    # 1. Parse KML (no snapping yet)
     _stage(1, "Parsing KML...", progress_callback)
     gdf_ofds_nodes, gdf_spans = process_kml_file(config.kml_path(), config)
 
-    # 2. Optional merge contiguous spans (before breaking at nodes).
+    # 2. Optional merge proximate nodes (before snapping / span operations)
+    if config.merge_proximate_nodes:
+        _stage(2, "Merging proximate nodes...", progress_callback)
+        n_before = len(gdf_ofds_nodes)
+        gdf_ofds_nodes = merge_proximate_nodes(
+            gdf_ofds_nodes,
+            config.merge_proximate_nodes_meters,
+        )
+        print(
+            f"  Proximity: {config.merge_proximate_nodes_meters} m → "
+            f"{n_before} -> {len(gdf_ofds_nodes)} nodes"
+        )
+    else:
+        _stage(2, "Merging proximate nodes... (skipped)", progress_callback)
+
+    # 3. Snap nodes to spans
+    _stage(3, "Snapping nodes to spans...", progress_callback)
+    n_nodes = len(gdf_ofds_nodes)
+    n_spans = len(gdf_spans)
+    print(
+        f"  Snapping {n_nodes} nodes to {n_spans} spans "
+        f"(this may take several minutes for large files)...",
+        flush=True,
+    )
+    gdf_ofds_nodes = snap_nodes_to_spans(gdf_ofds_nodes, gdf_spans)
+
+    # 4. Optional merge contiguous spans (before breaking at nodes).
     # merge_contiguous_spans joins pieces that share endpoints. After
     # break_spans_at_node_points those pieces are head-to-tail; merging then
     # reassembles the line and drops the split (sharp bends, T-junctions, etc.).
@@ -74,7 +102,7 @@ def run_pipeline(
         f"{len(gdf_ofds_nodes)} nodes, min vertices: {min_vert}"
     )
     if config.merge_contiguous_spans:
-        _stage(2, "Merging contiguous spans...", progress_callback)
+        _stage(4, "Merging contiguous spans...", progress_callback)
         spans_before = len(gdf_spans)
         print(
             f"  Precision: {config.merge_contiguous_spans_precision} decimal places"
@@ -88,10 +116,10 @@ def run_pipeline(
         merged_n = spans_before - len(gdf_spans)
         print(f"  After merge: {len(gdf_spans)} spans ({merged_n} merged)")
     else:
-        _stage(2, "Merging contiguous spans... (skipped)", progress_callback)
+        _stage(4, "Merging contiguous spans... (skipped)", progress_callback)
 
-    # 3. Break spans at node points
-    _stage(3, "Breaking spans at node points...", progress_callback)
+    # 5. Break spans at node points
+    _stage(5, "Breaking spans at node points...", progress_callback)
     gdf_nodes_for_breaking = filter_ignored_nodes(
         gdf_ofds_nodes, config.ignore_placemarks
     )
@@ -117,8 +145,8 @@ def run_pipeline(
         f"  After break: {len(gdf_spans)} spans, min vertices: {min_vert}"
     )
 
-    # 4. Add missing nodes
-    _stage(4, "Adding missing nodes...", progress_callback)
+    # 6. Add missing nodes
+    _stage(6, "Adding missing nodes...", progress_callback)
     nodes_before = len(gdf_ofds_nodes)
     gdf_ofds_nodes, gdf_auto_gen_nodes = add_missing_nodes(
         gdf_spans,
@@ -136,8 +164,8 @@ def run_pipeline(
         f"Total nodes: {nodes_before} -> {len(gdf_ofds_nodes)}"
     )
 
-    # 5. Add nodes to spans
-    _stage(5, "Adding nodes to spans...", progress_callback)
+    # 7. Add nodes to spans
+    _stage(7, "Adding nodes to spans...", progress_callback)
     min_vert = pd.Series([len(x.coords) for x in gdf_spans.geometry]).min()
     print(
         f"  Before: {len(gdf_spans)} spans, "
@@ -162,8 +190,8 @@ def run_pipeline(
         f"{len(gdf_ofds_nodes)} nodes, min vertices: {min_vert}"
     )
 
-    # 6. Consolidate auto-generated nodes
-    _stage(6, "Consolidating auto-generated nodes...", progress_callback)
+    # 8. Consolidate auto-generated nodes
+    _stage(8, "Consolidating auto-generated nodes...", progress_callback)
     spans_before = len(gdf_ofds_spans)
     nodes_before = len(gdf_ofds_nodes)
     min_vert = pd.Series([len(x.coords) for x in gdf_ofds_spans.geometry]).min()
@@ -191,8 +219,8 @@ def run_pipeline(
         f"min vertices: {min_vert}"
     )
 
-    # 7. Final filter same start/end
-    _stage(7, "Final filter...", progress_callback)
+    # 9. Final filter same start/end
+    _stage(9, "Final filter...", progress_callback)
     spans_before_final = len(gdf_ofds_spans)
     start_ids = gdf_ofds_spans["start"].apply(extract_node_id)
     end_ids = gdf_ofds_spans["end"].apply(extract_node_id)
@@ -219,8 +247,8 @@ def run_pipeline(
         config.network_providers_name,
     )
 
-    # 8. Export
-    _stage(8, "Exporting...", progress_callback)
+    # 10. Export
+    _stage(10, "Exporting...", progress_callback)
     print("  Converting to OFDS JSON (this may take a moment)...", flush=True)
     export_ofds(
         gdf_ofds_nodes,
