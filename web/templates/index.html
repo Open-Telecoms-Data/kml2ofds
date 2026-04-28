@@ -51,6 +51,12 @@
             color: var(--error);
             line-height: 1.4;
         }
+        .field-hint {
+            margin-top: 0.35rem;
+            font-size: 0.82rem;
+            color: var(--text-muted);
+            line-height: 1.4;
+        }
         input[type="checkbox"] {
             margin-right: 0.5rem;
         }
@@ -184,6 +190,31 @@
             color: #7dd3fc;
             text-decoration: underline;
         }
+        .processing-options-intro {
+            margin: 0 0 0.25rem;
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            line-height: 1.45;
+        }
+        .processing-subsection {
+            margin-top: 1.25rem;
+        }
+        .processing-subsection:first-of-type {
+            margin-top: 0;
+        }
+        .processing-subsection-title {
+            font-size: 0.78rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            margin: 0 0 0.65rem;
+            padding-bottom: 0.4rem;
+            border-bottom: 1px solid var(--border);
+        }
+        .processing-subsection > h3 + .merge-options-group {
+            margin-top: 0.5rem;
+        }
         .merge-options-group {
             margin-top: 1rem;
             padding: 1rem;
@@ -191,13 +222,36 @@
             border: 1px solid var(--border);
             border-radius: 6px;
         }
+        .merge-options-group > .checkbox-row:first-child {
+            margin-top: 0;
+        }
         .merge-options-group .merge-precision-row {
             margin-top: 0.75rem;
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 0.25rem 1rem;
+            align-items: center;
+        }
+        @media (min-width: 520px) {
+            .merge-options-group .merge-precision-row {
+                grid-template-columns: minmax(0, 1fr) auto;
+            }
+            .merge-options-group .merge-precision-row label {
+                margin-top: 0;
+            }
+            .merge-options-group .merge-precision-row input,
+            .merge-options-group .merge-precision-row select {
+                margin-top: 0;
+                width: auto;
+                min-width: 5.5rem;
+                max-width: 10rem;
+            }
         }
         .merge-options-group.disabled .merge-precision-row {
             opacity: 0.5;
         }
-        .merge-options-group.disabled .merge-precision-row input {
+        .merge-options-group.disabled .merge-precision-row input,
+        .merge-options-group.disabled .merge-precision-row select {
             cursor: not-allowed;
         }
         .node-label {
@@ -308,51 +362,69 @@
 
         <fieldset>
             <legend>Processing options</legend>
-            <label for="ignore_placemarks">
-                <span class="label-with-help">
-                    Nodes to Ignore
-                    <span class="help-icon">?
-                        <span class="help-tooltip">If there are nodes on the KML map that should be ignored, such as manholes for example, you can provide a semi-colon separated list of regular expressions to ignore. See <a href="https://docs.python.org/3/howto/regex.html" target="_blank" rel="noopener">Python regex guide</a> for a guide to regular expressions.</span>
-                    </span>
-                </span>
-            </label>
-            <input type="text" id="ignore_placemarks" name="ignore_placemarks" placeholder="name1; name2">
-            <div class="checkbox-row">
-                <input type="checkbox" id="merge_proximate_nodes" name="merge_proximate_nodes" value="true">
-                <label for="merge_proximate_nodes" style="margin-top:0">
+            <p class="processing-options-intro">Tune how placemarks are filtered, how nearby nodes are merged, and how line segments become spans. Defaults work for many maps; change these if the preview or output needs tuning.</p>
+
+            <div class="processing-subsection">
+                <h3 class="processing-subsection-title">Filtering</h3>
+                <label for="ignore_placemarks">
                     <span class="label-with-help">
-                        Merge proximate nodes
+                        Ignore nodes matching (regex)
                         <span class="help-icon">?
-                            <span class="help-tooltip">Before snapping or splitting, merge node placemarks that are within the distance below. The merged name combines originals, e.g. <strong>Node A / Node B</strong>. Uses the same metre→degree approximation as elsewhere (latitude scale).</span>
+                            <span class="help-tooltip">Skip placemarks whose names match any of these patterns. Use a <strong>semicolon-separated</strong> list of Python regular expressions, e.g. to drop manholes or test points. See the <a href="https://docs.python.org/3/howto/regex.html" target="_blank" rel="noopener">Python regex how-to</a>.</span>
                         </span>
                     </span>
                 </label>
+                <input type="text" id="ignore_placemarks" name="ignore_placemarks" placeholder="e.g. ^MH-; test.*" autocomplete="off" aria-describedby="ignore_placemarks_hint">
+                <p id="ignore_placemarks_hint" class="field-hint">Separate multiple patterns with <strong>;</strong> Leave empty to keep all nodes.</p>
             </div>
-            <label for="merge_proximate_nodes_meters">
-                <span class="label-with-help">
-                    Proximate node merge distance (metres)
-                    <span class="help-icon">?
-                        <span class="help-tooltip">Maximum distance between node positions to merge when the option above is enabled. Default 50.</span>
-                    </span>
-                </span>
-            </label>
-            <input type="number" id="merge_proximate_nodes_meters" name="merge_proximate_nodes_meters" value="50" min="0" step="1">
+
+            <div class="processing-subsection">
+                <h3 class="processing-subsection-title">Nodes</h3>
+            <div class="merge-options-group" id="proximate-nodes-group">
+                <div class="checkbox-row">
+                    <input type="checkbox" id="merge_proximate_nodes" name="merge_proximate_nodes" value="true">
+                    <label for="merge_proximate_nodes" style="margin-top:0">
+                        <span class="label-with-help">
+                            Merge nearby nodes
+                            <span class="help-icon">?
+                                <span class="help-tooltip">Before snapping or splitting, merge nodes that are within the distance below. The merged name combines originals, e.g. <strong>Node A / Node B</strong>. Uses the same metre→degree approximation as elsewhere (latitude scale).</span>
+                            </span>
+                        </span>
+                    </label>
+                </div>
+                <div class="merge-precision-row">
+                    <label for="merge_proximate_nodes_meters">
+                        <span class="label-with-help">
+                            Merge nearby node distance (metres)
+                            <span class="help-icon">?
+                                <span class="help-tooltip">Maximum distance between node positions to merge when the option above is enabled. Default 50.</span>
+                            </span>
+                        </span>
+                    </label>
+                    <input type="number" id="merge_proximate_nodes_meters" name="merge_proximate_nodes_meters" value="50" min="0" step="1">
+                </div>
+            </div>
             <label for="threshold_meters">
                 <span class="label-with-help">
-                    Consolidation threshold (meters)
+                    Consolidation threshold (metres)
                     <span class="help-icon">?
-                        <span class="help-tooltip">The script adds nodes to the ends of spans that don't have a node in proximity. Sometimes this can lead to multiple nodes in proximity to each other that are actually only one node. This option sets a threshold in metres for how close nodes can be in proximity before they are merged by the script. You may need to experiment with this option to get the best output from the conversion script</span>
+                        <span class="help-tooltip">The converter may add nodes at span ends where the KML line does not quite meet a placemark. That can leave several coordinates very close together that should be one junction. This distance (in metres) is how close such nodes must be before they are merged. Increase or decrease if you see duplicate junctions or over-merging.</span>
                     </span>
                 </span>
             </label>
             <input type="number" id="threshold_meters" name="threshold_meters" value="5000" min="0" step="100">
-            <div class="checkbox-row">
+            <p class="field-hint">Applies after geometry cleanup; unrelated to <strong>Merge nearby nodes</strong> above.</p>
+            </div>
+
+            <div class="processing-subsection">
+                <h3 class="processing-subsection-title">Spans</h3>
+            <div class="checkbox-row" style="margin-top:0">
                 <input type="checkbox" id="rename_spans_from_nodes" name="rename_spans_from_nodes" value="true" checked>
                 <label for="rename_spans_from_nodes" style="margin-top:0">
                     <span class="label-with-help">
-                        Rename spans from node names
+                        Name each span from its end nodes
                         <span class="help-icon">?
-                            <span class="help-tooltip">When this option is clicked, each span will be given a name made of the start and end nodes of the span. e.g. 'Node A - Node B'</span>
+                            <span class="help-tooltip">When enabled, each span is named from its start and end node names, e.g. <strong>Node A – Node B</strong>. Turn off to keep original KML line names where present.</span>
                         </span>
                     </span>
                 </label>
@@ -388,6 +460,7 @@
                     </select>
                 </div>
             </div>
+            </div>
         </fieldset>
 
         <button type="submit" id="submit-btn">Convert</button>
@@ -412,6 +485,9 @@
         const mergeOptionsGroup = document.getElementById('merge-options-group');
         const mergeCheckbox = document.getElementById('merge_contiguous_spans');
         const mergePrecisionInput = document.getElementById('merge_contiguous_spans_precision');
+        const proximateNodesGroup = document.getElementById('proximate-nodes-group');
+        const proximateNodesCheckbox = document.getElementById('merge_proximate_nodes');
+        const proximateNodesMetersInput = document.getElementById('merge_proximate_nodes_meters');
         const networkNameInput = document.getElementById('network_name');
         const networkIdInput = document.getElementById('network_id');
         const networkIdErrorEl = document.getElementById('network_id_error');
@@ -527,6 +603,14 @@
         }
         mergeCheckbox.addEventListener('change', updateMergePrecisionState);
         updateMergePrecisionState();
+
+        function updateProximateNodesState() {
+            const enabled = proximateNodesCheckbox.checked;
+            proximateNodesGroup.classList.toggle('disabled', !enabled);
+            proximateNodesMetersInput.disabled = !enabled;
+        }
+        proximateNodesCheckbox.addEventListener('change', updateProximateNodesState);
+        updateProximateNodesState();
         const progressList = document.getElementById('progress-list');
         const downloadContainer = document.getElementById('download-container');
         const mapSection = document.getElementById('map-section');
