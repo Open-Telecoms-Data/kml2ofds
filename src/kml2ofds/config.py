@@ -6,9 +6,8 @@ import configparser
 import os
 import sys
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
-from pathlib import Path
 from typing import Optional
 
 from .constants import DEFAULT_NETWORK_LINKS
@@ -57,6 +56,7 @@ class Config:
     merge_proximate_nodes: bool
     merge_proximate_nodes_meters: float
     validate_output: bool = False
+    postprocess_to_ofds_04: bool = True
 
     def kml_path(self) -> str:
         """Full path to the KML file."""
@@ -131,6 +131,9 @@ def config_from_dict(
         data.get("merge_proximate_nodes"), False
     )
     validate_output = _parse_bool(data.get("validate_output"), False)
+    postprocess_to_ofds_04 = _parse_bool(
+        data.get("postprocess_to_ofds_04"), True
+    )
 
     merge_nodes_m_str = data.get("merge_proximate_nodes_meters", "50")
     try:
@@ -171,6 +174,7 @@ def config_from_dict(
         merge_proximate_nodes=merge_proximate_nodes,
         merge_proximate_nodes_meters=merge_proximate_nodes_meters,
         validate_output=validate_output,
+        postprocess_to_ofds_04=postprocess_to_ofds_04,
     )
 
 
@@ -269,6 +273,9 @@ def load_config(config_file: str) -> Config:
         parsed.get("merge_proximate_nodes"), False
     )
     validate_output = _parse_bool(parsed.get("validate_output"), False)
+    postprocess_to_ofds_04 = _parse_bool(
+        parsed.get("postprocess_to_ofds_04"), True
+    )
 
     merge_nodes_m_str = parsed.get("merge_proximate_nodes_meters", "50")
     try:
@@ -311,4 +318,5 @@ def load_config(config_file: str) -> Config:
         merge_proximate_nodes=merge_proximate_nodes,
         merge_proximate_nodes_meters=merge_proximate_nodes_meters,
         validate_output=validate_output,
+        postprocess_to_ofds_04=postprocess_to_ofds_04,
     )

@@ -8,7 +8,7 @@ physicalInfrastructureProvider_name =
 physicalInfrastructureProvider_id = 
 networkProviders_name = 
 networkProviders_id = 
-network_links = https://raw.githubusercontent.com/Open-Telecoms-Data/open-fibre-data-standard/0__3__0/schema/network-schema.json
+network_links = https://standard.ofds.info/en/0__4__0/network-schema.json
 # Separate ignored placemarks with a semi-colon
 ignore_placemarks = 
 
@@ -29,6 +29,9 @@ merge_contiguous_spans_precision = 3
 # Merge distinct KML nodes within this distance (metres); combined name is "A / B". Default off.
 merge_proximate_nodes = false
 merge_proximate_nodes_meters = 50
+
+# Rewrite generated output package/GeoJSON to OFDS 0.4-compatible fields.
+postprocess_to_ofds_04 = true
 
 [DIRECTORY]
 input_directory = input/

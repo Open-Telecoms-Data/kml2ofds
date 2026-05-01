@@ -2,10 +2,9 @@
 Constants for kml2ofds: tolerances, OFDS schema URLs, and feature types.
 """
 
-# Default OFDS schema URL (0.3.0)
+# Default OFDS schema URL (0.4.0)
 DEFAULT_NETWORK_LINKS = (
-    "https://raw.githubusercontent.com/Open-Telecoms-Data/"
-    "open-fibre-data-standard/0__3__0/schema/network-schema.json"
+    "https://standard.ofds.info/en/0__4__0/network-schema.json"
 )
 
 # Feature type strings for OFDS GeoJSON

@@ -269,6 +269,7 @@
 {% block content %}
     <h1>kml2ofds</h1>
     <p class="subtitle">Convert KML fibre network maps to the Open Fibre Data Standard (OFDS)</p>
+    <p class="subtitle">Output is generated as OFDS 0.4-compatible JSON and GeoJSON files.</p>
 
     <form id="convert-form" enctype="multipart/form-data">
         <fieldset>
@@ -833,7 +834,7 @@
                                 const a = document.createElement('a');
                                 a.id = 'download-link';
                                 a.href = data.download_url;
-                                a.textContent = 'Download ZIP (nodes, spans, ofds.json)';
+                                a.textContent = 'Download ZIP (OFDS 0.4: nodes, spans, ofds.json)';
                                 a.download = 'kml2ofds-output.zip';
                                 downloadContainer.innerHTML = '';
                                 downloadContainer.appendChild(a);

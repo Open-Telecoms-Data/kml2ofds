@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 
 import pytest
+from click.testing import CliRunner
 
 # Add src to path for imports when running tests directly
 ROOT = Path(__file__).resolve().parent.parent
@@ -295,6 +296,122 @@ class TestConfig:
         uuid.UUID(c.network_providers_id)
         assert c.physical_infrastructure_provider_id != c.network_providers_id
 
+    def test_postprocess_to_ofds_04_defaults_true(self):
+        from kml2ofds.config import config_from_dict
+
+        cfg = config_from_dict({"kml_file_name": "x.kml"})
+        assert cfg.postprocess_to_ofds_04 is True
+
+    def test_postprocess_to_ofds_04_can_be_disabled(self):
+        from kml2ofds.config import config_from_dict
+
+        cfg = config_from_dict(
+            {
+                "kml_file_name": "x.kml",
+                "postprocess_to_ofds_04": "false",
+            }
+        )
+        assert cfg.postprocess_to_ofds_04 is False
+
+
+class TestOfdsMigration:
+    """Tests for post-export OFDS 0.3->0.4 migration."""
+
+    def test_migrate_package_moves_legacy_fields(self):
+        from kml2ofds.ofds_migrate import (
+            OFDS_03_SCHEMA_URL,
+            OFDS_04_SCHEMA_URL,
+            migrate_package_03_to_04,
+        )
+
+        source = {
+            "networks": [
+                {
+                    "id": "n",
+                    "links": [{"rel": "describedby", "href": OFDS_03_SCHEMA_URL}],
+                    "nodes": [
+                        {
+                            "id": "node-1",
+                            "physicalInfrastructureProvider": {"id": "org-1"},
+                        }
+                    ],
+                    "spans": [
+                        {
+                            "id": "span-1",
+                            "physicalInfrastructureProvider": {"id": "org-2"},
+                            "deploymentDetails": {"description": "legacy detail"},
+                        }
+                    ],
+                }
+            ]
+        }
+
+        migrated, result = migrate_package_03_to_04(source)
+        network = migrated["networks"][0]
+        node = network["nodes"][0]
+        span = network["spans"][0]
+
+        assert network["links"][0]["href"] == OFDS_04_SCHEMA_URL
+        assert "physicalInfrastructureProvider" not in node
+        assert node["transmissionMediumOwner"]["id"] == "org-1"
+        assert "physicalInfrastructureProvider" not in span
+        assert span["transmissionMediumOwner"]["id"] == "org-2"
+        assert "deploymentDetails" not in span
+        assert span["supportingInfrastructure"]["description"] == "legacy detail"
+        assert result.schema_links_updated == 1
+        assert result.node_provider_fields_migrated == 1
+        assert result.span_provider_fields_migrated == 1
+        assert result.span_deployment_details_migrated == 1
+
+    def test_cli_migrates_file(self, tmp_path):
+        from kml2ofds.ofds_migrate import OFDS_03_SCHEMA_URL, OFDS_04_SCHEMA_URL
+        from kml2ofds.ofds_migrate_cli import main
+
+        source = {
+            "networks": [
+                {
+                    "id": "net-1",
+                    "links": [
+                        {"rel": "describedby", "href": OFDS_03_SCHEMA_URL}
+                    ],
+                    "nodes": [
+                        {
+                            "id": "node-1",
+                            "physicalInfrastructureProvider": {"id": "org-1"},
+                        }
+                    ],
+                    "spans": [
+                        {
+                            "id": "span-1",
+                            "physicalInfrastructureProvider": {"id": "org-2"},
+                        }
+                    ],
+                }
+            ]
+        }
+        input_path = tmp_path / "in.json"
+        output_path = tmp_path / "out.json"
+        input_path.write_text(json.dumps(source), encoding="utf-8")
+
+        runner = CliRunner()
+        result = runner.invoke(
+            main,
+            [
+                "--input",
+                str(input_path),
+                "--output",
+                str(output_path),
+                "--no-validate",
+            ],
+        )
+
+        assert result.exit_code == 0
+        migrated = json.loads(output_path.read_text(encoding="utf-8"))
+        network = migrated["networks"][0]
+        assert network["links"][0]["href"] == OFDS_04_SCHEMA_URL
+        assert "physicalInfrastructureProvider" not in network["nodes"][0]
+        assert "transmissionMediumOwner" in network["nodes"][0]
+
 
 class TestIntegration:
     """Integration test: full pipeline on minimal KML."""
@@ -330,11 +447,28 @@ class TestIntegration:
             nodes = json.load(f)
         with open(paths.spans_geojson) as f:
             spans = json.load(f)
+        with open(paths.ofds_json) as f:
+            ofds = json.load(f)
 
         assert "features" in nodes
         assert "features" in spans
         assert len(nodes["features"]) >= 2
         assert len(spans["features"]) >= 1
+        network = ofds["networks"][0]
+        assert (
+            network["links"][0]["href"]
+            == "https://standard.ofds.info/en/0__4__0/network-schema.json"
+        )
+        assert len(network.get("nodes", [])) >= 2
+        assert len(network.get("spans", [])) >= 1
+        assert all(
+            "physicalInfrastructureProvider" not in node
+            for node in network.get("nodes", [])
+        )
+        assert all(
+            "physicalInfrastructureProvider" not in span
+            for span in network.get("spans", [])
+        )
 
 
 class TestRfc4122NetworkId:

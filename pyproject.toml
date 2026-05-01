@@ -35,6 +35,7 @@ classifiers = [
 [project.scripts]
 # Install kml2ofds program to user's PATH (uses refactored package in src/kml2ofds)
 kml2ofds = "kml2ofds:main"
+ofds-03to04 = "kml2ofds.ofds_migrate_cli:main"
 
 [project.optional-dependencies]
 test = ["pytest>=7.0"]

@@ -14,6 +14,37 @@ kml2ofds --network-profile path/to/your/profile.ini
 
 The profile specifies the KML file to convert, input/output directories, network metadata, and processing options. See `default.profile` for a full example.
 
+To convert an existing OFDS `0.3` JSON dataset to `0.4` without running KML parsing:
+
+```sh
+ofds-03to04 --input path/to/input.json --output path/to/output.json
+```
+
+Optional regenerated GeoJSON outputs:
+
+```sh
+ofds-03to04 \
+  --input path/to/input.json \
+  --output path/to/output.json \
+  --nodes-geojson-output path/to/nodes.geojson \
+  --spans-geojson-output path/to/spans.geojson
+```
+
+Help and expected console output:
+
+```sh
+ofds-03to04 --help
+```
+
+```text
+Usage: ofds-03to04 [OPTIONS]
+  Convert an OFDS JSON dataset from 0.3 to 0.4.
+
+Examples:
+  Converted OFDS dataset to 0.4-compatible fields.
+  Changes: links=1, nodes=12, spans=34, deployment_details=2
+```
+
 ## Assumptions
 
 Core to OFDS is the principle that any span of fibre must be terminated at either end by a Point of Presence of some kind. Here we use Point of Presence in a loose sense—it might be a simple access point such as a manhole or a full point of presence. Consult the standard for more details.
@@ -61,6 +92,7 @@ Key options in `default.profile`:
 | `rename_spans_from_nodes` | Name spans from start/end node names |
 | `debug_enabled` | Write debug files to `debug_output_directory` |
 | `validate_output` | Validate output against OFDS schema |
+| `postprocess_to_ofds_04` | Rewrite generated files to OFDS 0.4-compatible fields (default: true) |
 
 ## Output
 
@@ -69,6 +101,8 @@ The pipeline produces three files in the output directory (with a date suffix):
 * `{prefix}_ofds-nodes_{date}.geojson` — nodes (points of presence)
 * `{prefix}_ofds-spans_{date}.geojson` — fibre spans
 * `{prefix}_ofds-json_{date}.json` — OFDS JSON bundle
+
+By default, outputs are post-processed to OFDS 0.4-compatible fields and schema links.
 
 ## Install kml2ofds
 

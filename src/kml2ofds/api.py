@@ -7,7 +7,7 @@ import tempfile
 from collections.abc import Callable
 from typing import Optional
 
-from .config import Config, config_from_dict, OutputPaths
+from .config import Config, config_from_dict
 
 TOTAL_STAGES = 10
 
@@ -255,6 +255,7 @@ def run_pipeline(
         gdf_ofds_spans,
         paths,
         validate=config.validate_output,
+        postprocess_to_ofds_04=config.postprocess_to_ofds_04,
     )
 
     print("\nComplete")
