@@ -7,6 +7,7 @@ import json
 import queue
 import secrets
 import threading
+import time
 from pathlib import Path
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
@@ -25,7 +26,11 @@ _download_store: dict[str, dict] = {}
 _store_lock = threading.Lock()
 
 MAX_KML_SIZE = 50 * 1024 * 1024  # 50MB
-CONVERSION_TIMEOUT = 120  # seconds (for thread join)
+# Progress is only emitted between pipeline stages; consolidation/export can run
+# many minutes without a new message. A short queue timeout caused false
+# "Conversion timed out" in the UI while the worker was still healthy.
+QUEUE_HEARTBEAT_SEC = 45
+MAX_CONVERSION_WALL_SEC = 2 * 60 * 60  # hard cap: 2 hours wall-clock
 
 app = FastAPI(title="kml2ofds Online", version="0.1.0")
 
@@ -200,13 +205,40 @@ async def convert(
             args=(kml_content, config_dict, progress_queue),
         )
         thread.start()
+        wall_start = time.monotonic()
 
         while True:
-            try:
-                event = progress_queue.get(timeout=CONVERSION_TIMEOUT)
-            except queue.Empty:
-                yield _sse_format({"error": "Conversion timed out"})
+            if time.monotonic() - wall_start > MAX_CONVERSION_WALL_SEC:
+                yield _sse_format(
+                    {
+                        "error": (
+                            "Conversion exceeded maximum time limit "
+                            f"({MAX_CONVERSION_WALL_SEC // 3600} hours). "
+                            "Try simplifying the KML or running the CLI locally."
+                        )
+                    }
+                )
                 break
+
+            try:
+                event = progress_queue.get(timeout=QUEUE_HEARTBEAT_SEC)
+            except queue.Empty:
+                if thread.is_alive():
+                    # SSE comment: keeps some proxies from closing idle streams.
+                    yield ": ping\n\n"
+                    continue
+                try:
+                    event = progress_queue.get_nowait()
+                except queue.Empty:
+                    yield _sse_format(
+                        {
+                            "error": (
+                                "Conversion ended without result "
+                                "(worker stopped unexpectedly)."
+                            )
+                        }
+                    )
+                    break
 
             if "error" in event:
                 yield _sse_format(event)

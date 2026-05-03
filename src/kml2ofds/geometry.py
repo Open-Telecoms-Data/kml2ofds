@@ -747,11 +747,16 @@ def add_missing_nodes(
             add_if_new(end_pt)
 
     crs = gdf_nodes.crs or "EPSG:4326"
+    nodes_base = (
+        gdf_nodes.set_crs(crs, allow_override=True)
+        if gdf_nodes.crs is None
+        else gdf_nodes
+    )
     if new_nodes:
         new_gdf = gpd.GeoDataFrame.from_features(new_nodes, crs=crs)
-        combined = pd.concat([gdf_nodes, new_gdf], ignore_index=True)
+        combined = pd.concat([nodes_base, new_gdf], ignore_index=True)
     else:
-        combined = gdf_nodes
+        combined = nodes_base
         new_gdf = gpd.GeoDataFrame(
             {c: pd.Series(dtype=gdf_nodes[c].dtype) for c in gdf_nodes.columns}
         ).set_crs(crs)
@@ -778,9 +783,11 @@ def add_nodes_to_spans(
         start_ids.append(start_match["id"] if start_match is not None else None)
         end_ids.append(end_match["id"] if end_match is not None else None)
         if counter % 100 == 0 or counter == len(gdf_spans):
-            print(f"\rAssociating nodes with spans {counter} of {len(gdf_spans)}", end="", flush=True)
-
-    print()
+            # Newlines (not \\r) so systemd/journald records clean lines.
+            print(
+                f"  Associating nodes with spans {counter}/{len(gdf_spans)}",
+                flush=True,
+            )
     gdf_spans = gdf_spans.copy()
     gdf_spans["start"] = start_ids
     gdf_spans["end"] = end_ids

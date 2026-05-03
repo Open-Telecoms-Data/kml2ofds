@@ -308,8 +308,9 @@ def parse_kml_to_geodataframes(path: str, config: "Config") -> tuple[gpd.GeoData
     geojson_nodes = remove_duplicate_nodes(geojson_nodes, 1)
     print(f"Number of nodes found after deduplication: {len(geojson_nodes)}", flush=True)
 
-    gdf_nodes = gpd.GeoDataFrame.from_features(geojson_nodes)
-    gdf_spans = gpd.GeoDataFrame.from_features(geojson_spans)
+    # KML uses WGS84; CRS avoids geopandas concat warnings downstream.
+    gdf_nodes = gpd.GeoDataFrame.from_features(geojson_nodes, crs="EPSG:4326")
+    gdf_spans = gpd.GeoDataFrame.from_features(geojson_spans, crs="EPSG:4326")
 
     return gdf_nodes, gdf_spans
 
