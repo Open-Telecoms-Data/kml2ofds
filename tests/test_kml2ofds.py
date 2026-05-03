@@ -5,6 +5,8 @@ Unit and integration tests for kml2ofds package.
 import json
 import os
 import sys
+import time
+from copy import deepcopy
 from pathlib import Path
 
 import pytest
@@ -411,6 +413,35 @@ class TestOfdsMigration:
         assert network["links"][0]["href"] == OFDS_04_SCHEMA_URL
         assert "physicalInfrastructureProvider" not in network["nodes"][0]
         assert "transmissionMediumOwner" in network["nodes"][0]
+
+    def test_json_to_geojson_converter_scales_linearly_with_patch(self):
+        """libcoveofds span endpoint resolution is O(spans*nodes) upstream; patch fixes."""
+        from libcoveofds.geojson import JSONToGeoJSONConverter
+
+        from kml2ofds.libcoveofds_span_endpoint_patch import (
+            apply_libcoveofds_span_endpoint_patch,
+        )
+
+        apply_libcoveofds_span_endpoint_patch()
+        n = 6000
+        nodes = [
+            {"id": f"node-{i}", "name": {"lang": "en", "name": f"N{i}"}}
+            for i in range(n)
+        ]
+        spans = [
+            {"id": f"span-{i}", "start": f"node-{i}", "end": f"node-{i + 1}"}
+            for i in range(n - 1)
+        ]
+        pkg = {"networks": [{"id": "net", "nodes": nodes, "spans": spans}]}
+        t0 = time.monotonic()
+        converter = JSONToGeoJSONConverter()
+        converter.process_package(deepcopy(pkg))
+        elapsed = time.monotonic() - t0
+        assert elapsed < 15.0, f"converter took {elapsed:.1f}s (patch missing?)"
+        feats = converter.get_spans_geojson()["features"]
+        assert len(feats) == n - 1
+        start0 = feats[0]["properties"]["start"]
+        assert isinstance(start0, dict) and start0.get("id") == "node-0"
 
 
 class TestIntegration:

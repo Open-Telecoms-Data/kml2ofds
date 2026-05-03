@@ -156,6 +156,10 @@ def migrate_output_files_to_04(
 
     from libcoveofds.geojson import JSONToGeoJSONConverter
 
+    from .libcoveofds_span_endpoint_patch import apply_libcoveofds_span_endpoint_patch
+
+    apply_libcoveofds_span_endpoint_patch()
+
     with open(paths.ofds_json, "w", encoding="utf-8") as f:
         json.dump(migrated, f, indent=4, ensure_ascii=False)
 

@@ -87,6 +87,10 @@ def main(
     if nodes_geojson_output or spans_geojson_output:
         from libcoveofds.geojson import JSONToGeoJSONConverter
 
+        from .libcoveofds_span_endpoint_patch import apply_libcoveofds_span_endpoint_patch
+
+        apply_libcoveofds_span_endpoint_patch()
+
         converter = JSONToGeoJSONConverter()
         converter.process_package(migrated)
         if nodes_geojson_output:
